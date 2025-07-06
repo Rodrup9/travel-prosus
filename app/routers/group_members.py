@@ -29,13 +29,13 @@ def get_member_by_ids(group_id: uuid.UUID, user_id: uuid.UUID, db: Session = Dep
         raise HTTPException(status_code=404, detail="Miembro no encontrado")
     return member
 
-@router.get("/group/{group_id}", response_model=List[GroupMemberResponse])
-def get_members_by_group(group_id: uuid.UUID, db: Session = Depends(get_db)):
-    return GroupMemberService.get_members_by_group(db, group_id)
+# @router.get("/group/{group_id}", response_model=List[GroupMemberResponse])
+# def get_members_by_group(group_id: uuid.UUID, db: Session = Depends(get_db)):
+#     return GroupMemberService.get_members_by_group(db, group_id)
 
-@router.get("/user/{user_id}", response_model=List[GroupMemberResponse])
-def get_members_by_user(user_id: uuid.UUID, db: Session = Depends(get_db)):
-    return GroupMemberService.get_members_by_user(db, user_id)
+# @router.get("/user/{user_id}", response_model=List[GroupMemberResponse])
+# def get_members_by_user(user_id: uuid.UUID, db: Session = Depends(get_db)):
+#     return GroupMemberService.get_members_by_user(db, user_id)
 
 @router.put("/{group_id}/{user_id}", response_model=GroupMemberResponse)
 def update_member(group_id: uuid.UUID, user_id: uuid.UUID, member_update: GroupMemberUpdate, db: Session = Depends(get_db)):
