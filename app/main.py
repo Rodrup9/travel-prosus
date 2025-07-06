@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.routers import users
 from app.database import init_db
-from neo4j_client import Neo4jClient
+from app.neo4j_client import Neo4jClient
 
 neo4j_client = Neo4jClient()
 

@@ -1,5 +1,5 @@
 from typing import List, Optional
-from neo4j_client import Neo4jClient
+from app.neo4j_client import Neo4jClient
 from models.preferences import UserPreferenceBase, UserPreferenceResponse
 
 class PreferenceService:
