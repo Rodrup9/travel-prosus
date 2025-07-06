@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Query
 from models.preferences import UserPreferenceResponse
 from typing import List, Optional
+import neo4j_client
 from servies.preference_service import PreferenceService
 from neo4j_client import Neo4jClient
 from models.preference import PreferencesModel
