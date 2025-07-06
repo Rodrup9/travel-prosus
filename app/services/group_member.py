@@ -10,7 +10,6 @@ class GroupMemberService:
     @staticmethod
     def create_member(db: Session, member: GroupMemberCreate) -> GroupMember:
         db_member = GroupMember(
-            id=uuid.uuid4(),
             group_id=member.group_id,
             user_id=member.user_id,
             status=member.status
@@ -25,16 +24,30 @@ class GroupMemberService:
             raise ValueError("Ya existe este miembro en el grupo o claves inválidas")
 
     @staticmethod
-    def get_member_by_id(db: Session, member_id: uuid.UUID) -> Optional[GroupMember]:
-        return db.query(GroupMember).filter(GroupMember.id == member_id).first()
+    def get_member_by_ids(db: Session, group_id: uuid.UUID, user_id: uuid.UUID) -> Optional[GroupMember]:
+        return db.query(GroupMember).filter(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == user_id
+        ).first()
 
     @staticmethod
     def get_members(db: Session, skip: int = 0, limit: int = 100) -> List[GroupMember]:
         return db.query(GroupMember).offset(skip).limit(limit).all()
 
     @staticmethod
-    def update_member(db: Session, member_id: uuid.UUID, member_update: GroupMemberUpdate) -> Optional[GroupMember]:
-        db_member = db.query(GroupMember).filter(GroupMember.id == member_id).first()
+    def get_members_by_group(db: Session, group_id: uuid.UUID) -> List[GroupMember]:
+        return db.query(GroupMember).filter(GroupMember.group_id == group_id).all()
+
+    @staticmethod
+    def get_members_by_user(db: Session, user_id: uuid.UUID) -> List[GroupMember]:
+        return db.query(GroupMember).filter(GroupMember.user_id == user_id).all()
+
+    @staticmethod
+    def update_member(db: Session, group_id: uuid.UUID, user_id: uuid.UUID, member_update: GroupMemberUpdate) -> Optional[GroupMember]:
+        db_member = db.query(GroupMember).filter(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == user_id
+        ).first()
         if not db_member:
             return None
 
@@ -51,8 +64,11 @@ class GroupMemberService:
             raise ValueError("Error al actualizar miembro del grupo")
 
     @staticmethod
-    def delete_member(db: Session, member_id: uuid.UUID) -> bool:
-        db_member = db.query(GroupMember).filter(GroupMember.id == member_id).first()
+    def delete_member(db: Session, group_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        db_member = db.query(GroupMember).filter(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == user_id
+        ).first()
         if not db_member:
             return False
 
@@ -61,8 +77,11 @@ class GroupMemberService:
         return True
 
     @staticmethod
-    def toggle_member_status(db: Session, member_id: uuid.UUID) -> Optional[GroupMember]:
-        db_member = db.query(GroupMember).filter(GroupMember.id == member_id).first()
+    def toggle_member_status(db: Session, group_id: uuid.UUID, user_id: uuid.UUID) -> Optional[GroupMember]:
+        db_member = db.query(GroupMember).filter(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == user_id
+        ).first()
         if not db_member:
             return None
 
