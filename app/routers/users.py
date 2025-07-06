@@ -16,6 +16,11 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/group_members/{group_id}", response_model=List[UserResponse])
+async def get_user_by_group_id(group_id: uuid.UUID, db: Session = Depends(get_db)):
+    db_user = UserService.get_user_by_group_id(db, group_id)
+    return db_user
+
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(user_id: uuid.UUID, db: Session = Depends(get_db)):
     db_user = UserService.get_user_by_id(db, user_id)
