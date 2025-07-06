@@ -1,6 +1,6 @@
 # neo4j_client.py
 from neo4j import GraphDatabase
-from config import NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
+from app.config import NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 
 class Neo4jClient:
     def __init__(self):
