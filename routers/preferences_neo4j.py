@@ -1,32 +1,22 @@
 # routers/preferences.py
-from fastapi import APIRouter
+
+from fastapi import APIRouter, Query
+from models.preferences import UserPreferenceResponse
+from typing import List, Optional
+from servies.preference_service import PreferenceService
 from neo4j_client import Neo4jClient
 from models.preference import PreferencesModel
 import textwrap
+
 router = APIRouter()
-neo4j_client = Neo4jClient()
+preference_service = PreferenceService()
 
-@router.get("/preferences/users")
-def obtener_preferencias_usuarios():
-    query = """
-    MATCH (u:User)-[r]->(p:Preference)
-    WHERE type(r) STARTS WITH 'HAS_PREFERENCE_'
-    RETURN
-      u.name AS Usuario,
-      collect(CASE WHEN type(r) = 'HAS_PREFERENCE_DESTINATION' THEN p.name ELSE null END) AS Destinos,
-      collect(CASE WHEN type(r) = 'HAS_PREFERENCE_ACTIVITIES' THEN p.name ELSE null END) AS Actividades,
-      collect(CASE WHEN type(r) = 'HAS_PREFERENCE_PRICE' THEN p.name ELSE null END) AS Precios,
-      collect(CASE WHEN type(r) = 'HAS_PREFERENCE_ACCOMMODATION' THEN p.name ELSE null END) AS Alojamientos,
-      collect(CASE WHEN type(r) = 'HAS_PREFERENCE_TRASNPORT' THEN p.name ELSE null END) AS Transportes,
-      collect(CASE WHEN type(r) = 'HAS_PREFERENCE_MOTIVATION' THEN p.name ELSE null END) AS Motivaciones
-    """
-    try:
-        resultados = neo4j_client.run_query(query)
-        return resultados
-    except Exception as e:
-        return {"error": str(e)}
+@router.get("/preferences/users", response_model=UserPreferenceResponse)
+async def obtener_preferencias_usuarios(
+  sql_ids: Optional[List[str]] = Query(None, description="ID O IDs de SQL a consultar")
+):
 
-
+    return await preference_service.get_preferences(sql_ids)
 
 @router.post("/preferences/users")
 def create_preferences_user(data:PreferencesModel):
@@ -70,3 +60,4 @@ def create_preferences_user(data:PreferencesModel):
     except Exception as e:
         print(e)
         return {"error": str(e)}
+
