@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from app.models.user import User
+from app.models.user import User    
+from app.models.group_member import GroupMember
 from app.schemas.user import UserCreate, UserUpdate
 from typing import Optional, List
 import uuid
@@ -39,6 +40,10 @@ class UserService:
     def get_user_by_id(db: Session, user_id: uuid.UUID) -> Optional[User]:
         """Obtener usuario por ID"""
         return db.query(User).filter(User.id == user_id).first()
+    
+    @staticmethod
+    def get_user_by_group_id(db: Session, group_id: uuid.UUID) -> List[User]:
+        return db.query(User).join(GroupMember, User.id == GroupMember.user_id).filter(GroupMember.group_id == group_id).all()
     
     @staticmethod
     def get_user_by_email(db: Session, email: str) -> Optional[User]:
