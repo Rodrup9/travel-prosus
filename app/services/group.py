@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.models.group import Group
+from app.services.group_member import GroupMemberService
 from app.models.user import User
+from app.schemas.group_member import GroupMemberCreate
 from app.schemas.group import GroupCreate, GroupUpdate
 from typing import Optional, List
 import uuid
@@ -23,6 +25,11 @@ class GroupService:
             db.add(db_group)
             db.commit()
             db.refresh(db_group)
+            GroupMemberService.create_member(db, GroupMemberCreate(
+                group_id=db_group.id,
+                user_id=group.host_id,
+                status=True
+            ))
             return db_group
         except IntegrityError as e:
             db.rollback()
