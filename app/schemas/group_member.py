@@ -15,7 +15,8 @@ class GroupMemberUpdate(BaseModel):
     status: Optional[bool] = None
 
 class GroupMemberResponse(GroupMemberBase):
-    id: uuid.UUID
+    group_id: uuid.UUID
+    user_id: uuid.UUID
     created_at: datetime
 
     class Config:
