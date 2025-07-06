@@ -11,6 +11,7 @@ import textwrap
 
 router = APIRouter()
 preference_service = PreferenceService()
+neo4j_client = Neo4jClient()
 
 @router.get("/preferences/users", response_model=UserPreferenceResponse)
 async def obtener_preferencias_usuarios(
