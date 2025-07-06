@@ -1,103 +1,51 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import AsyncGenerator
-from sqlmodel.ext.asyncio.session import AsyncSession
-from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from app.schemas.group_member import GroupMemberCreate, GroupMemberUpdate, GroupMemberResponse
+from app.services.group_member import GroupMemberService
+from app.database import get_db
+import uuid
+from typing import List
 
-from app.database import async_session
+router = APIRouter(
+    prefix="/group-members",
+    tags=["Group Members"]
+)
 
-# TODO: Crear modelo GroupMember en app/models/group_member.py
-# Estructura sugerida:
-# class GroupMember(SQLModel, table=True):
-#     group_id: UUID = Field(foreign_key="group.id", primary_key=True)
-#     user_id: UUID = Field(foreign_key="user.id", primary_key=True)
-#     created_at: datetime = Field(default_factory=datetime.utcnow)
-#     status: bool = True
+@router.post("/", response_model=GroupMemberResponse, status_code=status.HTTP_201_CREATED)
+def create_member(member: GroupMemberCreate, db: Session = Depends(get_db)):
+    try:
+        return GroupMemberService.create_member(db, member)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-# TODO: Crear esquemas en app/schemas/group_member.py
-# from app.schemas.group_member import GroupMemberCreate, GroupMemberRead, GroupMemberUpdate
+@router.get("/", response_model=List[GroupMemberResponse])
+def get_all_members(db: Session = Depends(get_db)):
+    return GroupMemberService.get_members(db)
 
-# TODO: Crear servicios en app/services/group_member.py
-# from app.services.group_member import (
-#     create_group_member,
-#     get_group_member,
-#     get_all_group_members,
-#     get_group_members_by_group,
-#     get_group_members_by_user,
-#     update_group_member,
-#     delete_group_member,
-# )
+@router.get("/{member_id}", response_model=GroupMemberResponse)
+def get_member_by_id(member_id: uuid.UUID, db: Session = Depends(get_db)):
+    member = GroupMemberService.get_member_by_id(db, member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Miembro no encontrado")
+    return member
 
-router = APIRouter()
+@router.put("/{member_id}", response_model=GroupMemberResponse)
+def update_member(member_id: uuid.UUID, member_update: GroupMemberUpdate, db: Session = Depends(get_db)):
+    updated = GroupMemberService.update_member(db, member_id, member_update)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Miembro no encontrado")
+    return updated
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session() as session:
-        yield session
+@router.delete("/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_member(member_id: uuid.UUID, db: Session = Depends(get_db)):
+    deleted = GroupMemberService.delete_member(db, member_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Miembro no encontrado")
+    return
 
-@router.post("/")  # TODO: Agregar response_model=GroupMemberRead
-async def create(data: dict, session: AsyncSession = Depends(get_session)):  # TODO: Cambiar dict por GroupMemberCreate
-    """
-    Crear un nuevo miembro de grupo.
-    Requiere: group_id, user_id
-    """
-    # TODO: return await create_group_member(session, data)
-    raise HTTPException(status_code=501, detail="Implementar create_group_member service")
-
-@router.get("/")  # TODO: Agregar response_model=list[GroupMemberRead]
-async def read_all(session: AsyncSession = Depends(get_session)):
-    """
-    Obtener todos los miembros de grupos.
-    """
-    # TODO: return await get_all_group_members(session)
-    raise HTTPException(status_code=501, detail="Implementar get_all_group_members service")
-
-@router.get("/group/{group_id}")  # TODO: Agregar response_model=list[GroupMemberRead]
-async def read_by_group(group_id: UUID, session: AsyncSession = Depends(get_session)):
-    """
-    Obtener todos los miembros de un grupo específico.
-    """
-    # TODO: return await get_group_members_by_group(session, group_id)
-    raise HTTPException(status_code=501, detail="Implementar get_group_members_by_group service")
-
-@router.get("/user/{user_id}")  # TODO: Agregar response_model=list[GroupMemberRead]
-async def read_by_user(user_id: UUID, session: AsyncSession = Depends(get_session)):
-    """
-    Obtener todos los grupos de un usuario específico.
-    """
-    # TODO: return await get_group_members_by_user(session, user_id)
-    raise HTTPException(status_code=501, detail="Implementar get_group_members_by_user service")
-
-@router.get("/{group_id}/{user_id}")  # TODO: Agregar response_model=GroupMemberRead
-async def read(group_id: UUID, user_id: UUID, session: AsyncSession = Depends(get_session)):
-    """
-    Obtener un miembro específico de un grupo.
-    """
-    # TODO: Implementar get_group_member service
-    # group_member = await get_group_member(session, group_id, user_id)
-    # if not group_member:
-    #     raise HTTPException(status_code=404, detail="Miembro del grupo no encontrado")
-    # return group_member
-    raise HTTPException(status_code=501, detail="Implementar get_group_member service")
-
-@router.put("/{group_id}/{user_id}")  # TODO: Agregar response_model=GroupMemberRead
-async def update(group_id: UUID, user_id: UUID, data: dict, session: AsyncSession = Depends(get_session)):  # TODO: Cambiar dict por GroupMemberUpdate
-    """
-    Actualizar un miembro de grupo (normalmente solo el status).
-    """
-    # TODO: Implementar update_group_member service
-    # group_member = await update_group_member(session, group_id, user_id, data)
-    # if not group_member:
-    #     raise HTTPException(status_code=404, detail="Miembro del grupo no encontrado")
-    # return group_member
-    raise HTTPException(status_code=501, detail="Implementar update_group_member service")
-
-@router.delete("/{group_id}/{user_id}")
-async def delete(group_id: UUID, user_id: UUID, session: AsyncSession = Depends(get_session)):
-    """
-    Eliminar un miembro de un grupo.
-    """
-    # TODO: Implementar delete_group_member service
-    # success = await delete_group_member(session, group_id, user_id)
-    # if not success:
-    #     raise HTTPException(status_code=404, detail="Miembro del grupo no encontrado")
-    # return {"ok": True}
-    raise HTTPException(status_code=501, detail="Implementar delete_group_member service")
+@router.patch("/{member_id}/toggle-status", response_model=GroupMemberResponse)
+def toggle_member_status(member_id: uuid.UUID, db: Session = Depends(get_db)):
+    toggled = GroupMemberService.toggle_member_status(db, member_id)
+    if not toggled:
+        raise HTTPException(status_code=404, detail="Miembro no encontrado")
+    return toggled

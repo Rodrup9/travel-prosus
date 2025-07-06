@@ -1,49 +1,72 @@
-from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.models.group_member import GroupMember
 from app.schemas.group_member import GroupMemberCreate, GroupMemberUpdate
-from uuid import UUID
+from typing import Optional, List
+import uuid
 
-async def create_group_member(session: AsyncSession, data: GroupMemberCreate) -> GroupMember:
-    group_member = GroupMember(**data.dict())
-    session.add(group_member)
-    await session.commit()
-    await session.refresh(group_member)
-    return group_member
+class GroupMemberService:
 
-async def get_group_member(session: AsyncSession, group_id: UUID, user_id: UUID) -> GroupMember | None:
-    result = await session.execute(
-        select(GroupMember).where(GroupMember.group_id == group_id, GroupMember.user_id == user_id)
-    )
-    return result.scalar_one_or_none()
+    @staticmethod
+    def create_member(db: Session, member: GroupMemberCreate) -> GroupMember:
+        db_member = GroupMember(
+            id=uuid.uuid4(),
+            group_id=member.group_id,
+            user_id=member.user_id,
+            status=member.status
+        )
+        try:
+            db.add(db_member)
+            db.commit()
+            db.refresh(db_member)
+            return db_member
+        except IntegrityError:
+            db.rollback()
+            raise ValueError("Ya existe este miembro en el grupo o claves inválidas")
 
-async def get_all_group_members(session: AsyncSession) -> list[GroupMember]:
-    result = await session.execute(select(GroupMember))
-    return result.scalars().all()
+    @staticmethod
+    def get_member_by_id(db: Session, member_id: uuid.UUID) -> Optional[GroupMember]:
+        return db.query(GroupMember).filter(GroupMember.id == member_id).first()
 
-async def get_group_members_by_group(session: AsyncSession, group_id: UUID) -> list[GroupMember]:
-    result = await session.execute(select(GroupMember).where(GroupMember.group_id == group_id))
-    return result.scalars().all()
+    @staticmethod
+    def get_members(db: Session, skip: int = 0, limit: int = 100) -> List[GroupMember]:
+        return db.query(GroupMember).offset(skip).limit(limit).all()
 
-async def get_group_members_by_user(session: AsyncSession, user_id: UUID) -> list[GroupMember]:
-    result = await session.execute(select(GroupMember).where(GroupMember.user_id == user_id))
-    return result.scalars().all()
+    @staticmethod
+    def update_member(db: Session, member_id: uuid.UUID, member_update: GroupMemberUpdate) -> Optional[GroupMember]:
+        db_member = db.query(GroupMember).filter(GroupMember.id == member_id).first()
+        if not db_member:
+            return None
 
-async def update_group_member(session: AsyncSession, group_id: UUID, user_id: UUID, data: GroupMemberUpdate) -> GroupMember | None:
-    group_member = await get_group_member(session, group_id, user_id)
-    if not group_member:
-        return None
-    for key, value in data.dict(exclude_unset=True).items():
-        setattr(group_member, key, value)
-    session.add(group_member)
-    await session.commit()
-    await session.refresh(group_member)
-    return group_member
+        update_data = member_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_member, field, value)
 
-async def delete_group_member(session: AsyncSession, group_id: UUID, user_id: UUID) -> bool:
-    group_member = await get_group_member(session, group_id, user_id)
-    if not group_member:
-        return False
-    await session.delete(group_member)
-    await session.commit()
-    return True
+        try:
+            db.commit()
+            db.refresh(db_member)
+            return db_member
+        except IntegrityError:
+            db.rollback()
+            raise ValueError("Error al actualizar miembro del grupo")
+
+    @staticmethod
+    def delete_member(db: Session, member_id: uuid.UUID) -> bool:
+        db_member = db.query(GroupMember).filter(GroupMember.id == member_id).first()
+        if not db_member:
+            return False
+
+        db.delete(db_member)
+        db.commit()
+        return True
+
+    @staticmethod
+    def toggle_member_status(db: Session, member_id: uuid.UUID) -> Optional[GroupMember]:
+        db_member = db.query(GroupMember).filter(GroupMember.id == member_id).first()
+        if not db_member:
+            return None
+
+        db_member.status = not db_member.status
+        db.commit()
+        db.refresh(db_member)
+        return db_member

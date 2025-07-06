@@ -1,48 +1,81 @@
-from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select
+# app/services/itinerary_service.py
+
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.models.itinerary import Itinerary
 from app.schemas.itinerary import ItineraryCreate, ItineraryUpdate
-from uuid import UUID
-from datetime import date
+from typing import List, Optional
+import uuid
 
-async def create_itinerary(session: AsyncSession, data: ItineraryCreate) -> Itinerary:
-    itinerary = Itinerary(**data.dict())
-    session.add(itinerary)
-    await session.commit()
-    await session.refresh(itinerary)
-    return itinerary
 
-async def get_itinerary(session: AsyncSession, itinerary_id: UUID) -> Itinerary | None:
-    result = await session.execute(select(Itinerary).where(Itinerary.id == itinerary_id))
-    return result.scalar_one_or_none()
+class ItineraryService:
 
-async def get_all_itineraries(session: AsyncSession) -> list[Itinerary]:
-    result = await session.execute(select(Itinerary))
-    return result.scalars().all()
+    @staticmethod
+    def create_itinerary(db: Session, data: ItineraryCreate) -> Itinerary:
+        itinerary = Itinerary(
+            id=uuid.uuid4(),
+            trip_id=data.trip_id,
+            day=data.day,
+            activity=data.activity,
+            location=data.location,
+            start_time=data.start_time,
+            end_time=data.end_time,
+            status=data.status
+        )
+        try:
+            db.add(itinerary)
+            db.commit()
+            db.refresh(itinerary)
+            return itinerary
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError(f"Error al crear el itinerario: {str(e.orig)}")
 
-async def get_itineraries_by_trip(session: AsyncSession, trip_id: UUID) -> list[Itinerary]:
-    result = await session.execute(select(Itinerary).where(Itinerary.trip_id == trip_id))
-    return result.scalars().all()
+    @staticmethod
+    def get_all(db: Session) -> List[Itinerary]:
+        return db.query(Itinerary).all()
 
-async def get_itineraries_by_day(session: AsyncSession, trip_id: UUID, day: date) -> list[Itinerary]:
-    result = await session.execute(select(Itinerary).where(Itinerary.trip_id == trip_id, Itinerary.day == day))
-    return result.scalars().all()
+    @staticmethod
+    def get_by_id(db: Session, itinerary_id: uuid.UUID) -> Optional[Itinerary]:
+        return db.query(Itinerary).filter(Itinerary.id == itinerary_id).first()
 
-async def update_itinerary(session: AsyncSession, itinerary_id: UUID, data: ItineraryUpdate) -> Itinerary | None:
-    itinerary = await get_itinerary(session, itinerary_id)
-    if not itinerary:
-        return None
-    for key, value in data.dict(exclude_unset=True).items():
-        setattr(itinerary, key, value)
-    session.add(itinerary)
-    await session.commit()
-    await session.refresh(itinerary)
-    return itinerary
+    @staticmethod
+    def get_by_trip_id(db: Session, trip_id: uuid.UUID) -> List[Itinerary]:
+        return db.query(Itinerary).filter(Itinerary.trip_id == trip_id).all()
 
-async def delete_itinerary(session: AsyncSession, itinerary_id: UUID) -> bool:
-    itinerary = await get_itinerary(session, itinerary_id)
-    if not itinerary:
-        return False
-    await session.delete(itinerary)
-    await session.commit()
-    return True
+    @staticmethod
+    def update_itinerary(db: Session, itinerary_id: uuid.UUID, update: ItineraryUpdate) -> Optional[Itinerary]:
+        itinerary = db.query(Itinerary).filter(Itinerary.id == itinerary_id).first()
+        if not itinerary:
+            return None
+
+        update_data = update.dict(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(itinerary, key, value)
+
+        try:
+            db.commit()
+            db.refresh(itinerary)
+            return itinerary
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError(f"Error al actualizar el itinerario: {str(e.orig)}")
+
+    @staticmethod
+    def delete_itinerary(db: Session, itinerary_id: uuid.UUID) -> bool:
+        itinerary = db.query(Itinerary).filter(Itinerary.id == itinerary_id).first()
+        if not itinerary:
+            return False
+        db.delete(itinerary)
+        db.commit()
+        return True
+
+    @staticmethod
+    def toggle_status(db: Session, itinerary_id: uuid.UUID) -> Optional[Itinerary]:
+        itinerary = db.query(Itinerary).filter(Itinerary.id == itinerary_id).first()
+        if not itinerary:
+            return None
+        itinerary.status = not itinerary.status
+        db.commit()
+        db.refresh(itinerary)
+        return itinerary

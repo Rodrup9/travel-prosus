@@ -1,51 +1,83 @@
-from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select
+# app/services/flight_service.py
+
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.models.flight import Flight
 from app.schemas.flight import FlightCreate, FlightUpdate
-from uuid import UUID
+from typing import Optional, List
+import uuid
 
-async def create_flight(session: AsyncSession, data: FlightCreate) -> Flight:
-    flight = Flight(**data.dict())
-    session.add(flight)
-    await session.commit()
-    await session.refresh(flight)
-    return flight
 
-async def get_flight(session: AsyncSession, flight_id: UUID) -> Flight | None:
-    result = await session.execute(select(Flight).where(Flight.id == flight_id))
-    return result.scalar_one_or_none()
+class FlightService:
 
-async def get_all_flights(session: AsyncSession) -> list[Flight]:
-    result = await session.execute(select(Flight))
-    return result.scalars().all()
+    @staticmethod
+    def create_flight(db: Session, flight: FlightCreate) -> Flight:
+        db_flight = Flight(
+            id=uuid.uuid4(),
+            trip_id=flight.trip_id,
+            airline=flight.airline,
+            departure_airport=flight.departure_airport,
+            arrival_airport=flight.arrival_airport,
+            departure_time=flight.departure_time,
+            arrival_time=flight.arrival_time,
+            price=flight.price,
+            status=flight.status
+        )
+        try:
+            db.add(db_flight)
+            db.commit()
+            db.refresh(db_flight)
+            return db_flight
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError(f"Error al crear el vuelo: {str(e.orig)}")
 
-async def get_flights_by_trip(session: AsyncSession, trip_id: UUID) -> list[Flight]:
-    result = await session.execute(select(Flight).where(Flight.trip_id == trip_id))
-    return result.scalars().all()
+    @staticmethod
+    def get_flight_by_id(db: Session, flight_id: uuid.UUID) -> Optional[Flight]:
+        return db.query(Flight).filter(Flight.id == flight_id).first()
 
-async def get_flights_by_airline(session: AsyncSession, airline: str) -> list[Flight]:
-    result = await session.execute(select(Flight).where(Flight.airline == airline))
-    return result.scalars().all()
+    @staticmethod
+    def get_flights(db: Session, skip: int = 0, limit: int = 100) -> List[Flight]:
+        return db.query(Flight).offset(skip).limit(limit).all()
 
-async def get_flights_by_airport(session: AsyncSession, airport: str) -> list[Flight]:
-    result = await session.execute(select(Flight).where(Flight.departure_airport == airport))
-    return result.scalars().all()
+    @staticmethod
+    def get_flights_by_trip(db: Session, trip_id: uuid.UUID) -> List[Flight]:
+        return db.query(Flight).filter(Flight.trip_id == trip_id).all()
 
-async def update_flight(session: AsyncSession, flight_id: UUID, data: FlightUpdate) -> Flight | None:
-    flight = await get_flight(session, flight_id)
-    if not flight:
-        return None
-    for key, value in data.dict(exclude_unset=True).items():
-        setattr(flight, key, value)
-    session.add(flight)
-    await session.commit()
-    await session.refresh(flight)
-    return flight
+    @staticmethod
+    def update_flight(db: Session, flight_id: uuid.UUID, update_data: FlightUpdate) -> Optional[Flight]:
+        db_flight = db.query(Flight).filter(Flight.id == flight_id).first()
+        if not db_flight:
+            return None
 
-async def delete_flight(session: AsyncSession, flight_id: UUID) -> bool:
-    flight = await get_flight(session, flight_id)
-    if not flight:
-        return False
-    await session.delete(flight)
-    await session.commit()
-    return True
+        for field, value in update_data.dict(exclude_unset=True).items():
+            setattr(db_flight, field, value)
+
+        try:
+            db.commit()
+            db.refresh(db_flight)
+            return db_flight
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError(f"Error al actualizar el vuelo: {str(e.orig)}")
+
+    @staticmethod
+    def delete_flight(db: Session, flight_id: uuid.UUID) -> bool:
+        db_flight = db.query(Flight).filter(Flight.id == flight_id).first()
+        if not db_flight:
+            return False
+
+        db.delete(db_flight)
+        db.commit()
+        return True
+
+    @staticmethod
+    def toggle_status(db: Session, flight_id: uuid.UUID) -> Optional[Flight]:
+        db_flight = db.query(Flight).filter(Flight.id == flight_id).first()
+        if not db_flight:
+            return None
+
+        db_flight.status = not db_flight.status
+        db.commit()
+        db.refresh(db_flight)
+        return db_flight

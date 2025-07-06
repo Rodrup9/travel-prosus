@@ -1,20 +1,40 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from app.routers import users
-from app.database import init_db
-from app.neo4j_client import Neo4jClient
-from app.routers import preferences_neo4j
-neo4j_client = Neo4jClient()
+from app.routers import users, groups, trips, itineraries, flights, hotels, votes, group_chat, group_members, ia_chat
+from app.database import init_db, engine
+# from app.neo4j_client import Neo4jClient
+# from app.routers import preferences_neo4j
+
+# neo4j_client = Neo4jClient()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Aquí se ejecuta el evento startup
     await init_db()
     yield
-    # Aquí se ejecutaría shutdown si lo necesitas
+    engine.dispose()
+    print("Pool de conexiones cerrado")
 
 app = FastAPI(lifespan=lifespan)
 
-#app.include_router(preferences_neo4j.router)
-app.include_router(users.router, prefix="/users", tags=["Usuarios"])
-app.include_router(preferences_neo4j.router)
+# Incluir routers
+app.include_router(users.router, prefix="/users", tags=["Users"])
+app.include_router(groups.router, prefix="/groups", tags=["Groups"])
+app.include_router(trips.router, prefix="/trips", tags=["Trips"])
+app.include_router(itineraries.router, prefix="/itineraries", tags=["Itineraries"])
+app.include_router(flights.router, prefix="/flights", tags=["Flights"])
+app.include_router(hotels.router, prefix="/hotels", tags=["Hotels"])
+app.include_router(votes.router, prefix="/votes", tags=["Votes"])
+app.include_router(group_chat.router, prefix="/group_chat", tags=["Group Chat"])
+app.include_router(group_members.router, prefix="/groups", tags=["Group Members"])
+app.include_router(ia_chat.router, prefix="/ia_chat", tags=["IA Chat"])
+# app.include_router(preferences_neo4j.router)
+
+@app.get("/pool-status")
+async def pool_status():
+    return {
+        "pool_size": engine.pool.size(),
+        "checked_in": engine.pool.checkedin(),
+        "checked_out": engine.pool.checkedout(),
+        "overflow": engine.pool.overflow(),
+        # "invalid": engine.pool.invalid()
+    }

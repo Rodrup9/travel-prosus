@@ -1,47 +1,87 @@
-from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select
+# app/services/vote_service.py
+
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.models.vote import Vote
 from app.schemas.vote import VoteCreate, VoteUpdate
-from uuid import UUID
+from typing import Optional, List
+import uuid
 
-async def create_vote(session: AsyncSession, data: VoteCreate) -> Vote:
-    vote = Vote(**data.dict())
-    session.add(vote)
-    await session.commit()
-    await session.refresh(vote)
-    return vote
+class VoteService:
 
-async def get_vote(session: AsyncSession, vote_id: UUID) -> Vote | None:
-    result = await session.execute(select(Vote).where(Vote.id == vote_id))
-    return result.scalar_one_or_none()
+    @staticmethod
+    def create_vote(db: Session, vote: VoteCreate) -> Vote:
+        db_vote = Vote(
+            id=uuid.uuid4(),
+            trip_id=vote.trip_id,
+            user_id=vote.user_id,
+            vote=vote.vote,
+            comment=vote.comment,
+            status=vote.status
+        )
+        try:
+            db.add(db_vote)
+            db.commit()
+            db.refresh(db_vote)
+            return db_vote
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError(f"Error al crear voto: {str(e.orig)}")
 
-async def get_all_votes(session: AsyncSession) -> list[Vote]:
-    result = await session.execute(select(Vote))
-    return result.scalars().all()
+    @staticmethod
+    def get_vote_by_id(db: Session, vote_id: uuid.UUID) -> Optional[Vote]:
+        return db.query(Vote).filter(Vote.id == vote_id).first()
 
-async def get_votes_by_trip(session: AsyncSession, trip_id: UUID) -> list[Vote]:
-    result = await session.execute(select(Vote).where(Vote.trip_id == trip_id))
-    return result.scalars().all()
+    @staticmethod
+    def get_all_votes(db: Session, skip: int = 0, limit: int = 100) -> List[Vote]:
+        return db.query(Vote).offset(skip).limit(limit).all()
 
-async def get_votes_by_user(session: AsyncSession, user_id: UUID) -> list[Vote]:
-    result = await session.execute(select(Vote).where(Vote.user_id == user_id))
-    return result.scalars().all()
+    @staticmethod
+    def update_vote(db: Session, vote_id: uuid.UUID, vote_update: VoteUpdate) -> Optional[Vote]:
+        db_vote = db.query(Vote).filter(Vote.id == vote_id).first()
+        if not db_vote:
+            return None
 
-async def update_vote(session: AsyncSession, vote_id: UUID, data: VoteUpdate) -> Vote | None:
-    vote = await get_vote(session, vote_id)
-    if not vote:
-        return None
-    for key, value in data.dict(exclude_unset=True).items():
-        setattr(vote, key, value)
-    session.add(vote)
-    await session.commit()
-    await session.refresh(vote)
-    return vote
+        for key, value in vote_update.dict(exclude_unset=True).items():
+            setattr(db_vote, key, value)
 
-async def delete_vote(session: AsyncSession, vote_id: UUID) -> bool:
-    vote = await get_vote(session, vote_id)
-    if not vote:
-        return False
-    await session.delete(vote)
-    await session.commit()
-    return True
+        try:
+            db.commit()
+            db.refresh(db_vote)
+            return db_vote
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError(f"Error al actualizar voto: {str(e.orig)}")
+
+    @staticmethod
+    def delete_vote(db: Session, vote_id: uuid.UUID) -> bool:
+        db_vote = db.query(Vote).filter(Vote.id == vote_id).first()
+        if not db_vote:
+            return False
+
+        db.delete(db_vote)
+        db.commit()
+        return True
+
+    @staticmethod
+    def toggle_vote_status(db: Session, vote_id: uuid.UUID) -> Optional[Vote]:
+        db_vote = db.query(Vote).filter(Vote.id == vote_id).first()
+        if not db_vote:
+            return None
+
+        db_vote.status = not db_vote.status
+        db.commit()
+        db.refresh(db_vote)
+        return db_vote
+
+    @staticmethod
+    def get_votes_by_trip(db: Session, trip_id: uuid.UUID) -> List[Vote]:
+        return db.query(Vote).filter(Vote.trip_id == trip_id).all()
+
+    @staticmethod
+    def get_votes_by_user(db: Session, user_id: uuid.UUID) -> List[Vote]:
+        return db.query(Vote).filter(Vote.user_id == user_id).all()
+
+    @staticmethod
+    def get_votes_by_user_and_trip(db: Session, user_id: uuid.UUID, trip_id: uuid.UUID) -> List[Vote]:
+        return db.query(Vote).filter(Vote.user_id == user_id, Vote.trip_id == trip_id).all()

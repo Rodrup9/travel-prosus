@@ -1,107 +1,56 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import AsyncGenerator
-from sqlmodel.ext.asyncio.session import AsyncSession
-from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from app.services.group_chat import GroupChatService
+from app.schemas.group_chat import GroupChatCreate, GroupChatUpdate, GroupChatResponse
+from app.database import get_db
+from typing import List
+import uuid
 
-# Reemplaza esto con tu sesión async real
-from app.database import async_session
+router = APIRouter(prefix="/group-chat", tags=["Group Chat"])
 
-# TODO: Crear modelo GroupChat en app/models/group_chat.py
-# Estructura sugerida:
-# class GroupChat(SQLModel, table=True):
-#     id: UUID = Field(default_factory=uuid4, primary_key=True)
-#     created_at: datetime = Field(default_factory=datetime.utcnow)
-#     user_id: UUID = Field(foreign_key="user.id")
-#     group_id: UUID = Field(foreign_key="group.id")
-#     message: str
-#     status: bool = True
+@router.post("/", response_model=GroupChatResponse, status_code=status.HTTP_201_CREATED)
+def create_message(chat: GroupChatCreate, db: Session = Depends(get_db)):
+    try:
+        return GroupChatService.create_message(db, chat)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-# Reemplaza esto con tus esquemas reales
-# from app.schemas.group_chat import GroupChatCreate, GroupChatRead, GroupChatUpdate
+@router.get("/", response_model=List[GroupChatResponse])
+def get_all_messages(db: Session = Depends(get_db)):
+    return GroupChatService.get_all_messages(db)
 
-# Reemplaza esto con tus servicios reales
-# from app.services.group_chat import (
-#     create_group_chat,
-#     get_group_chat,
-#     get_all_group_chats,
-#     get_group_chats_by_group,
-#     get_group_chats_by_user,
-#     update_group_chat,
-#     delete_group_chat,
-# )
+@router.get("/{message_id}", response_model=GroupChatResponse)
+def get_message_by_id(message_id: uuid.UUID, db: Session = Depends(get_db)):
+    message = GroupChatService.get_message_by_id(db, message_id)
+    if not message:
+        raise HTTPException(status_code=404, detail="Mensaje no encontrado")
+    return message
 
-router = APIRouter()
+@router.get("/group/{group_id}", response_model=List[GroupChatResponse])
+def get_messages_by_group(group_id: uuid.UUID, db: Session = Depends(get_db)):
+    return GroupChatService.get_messages_by_group(db, group_id)
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session() as session:
-        yield session
+@router.get("/group/{group_id}/user/{user_id}", response_model=List[GroupChatResponse])
+def get_user_messages_in_group(group_id: uuid.UUID, user_id: uuid.UUID, db: Session = Depends(get_db)):
+    return GroupChatService.get_user_messages_in_group(db, group_id, user_id)
 
-@router.post("/")  # TODO: Agregar response_model=GroupChatRead
-async def create(data: dict, session: AsyncSession = Depends(get_session)):  # TODO: Cambiar dict por GroupChatCreate
-    """
-    Crear un nuevo mensaje de chat grupal.
-    Requiere: user_id, group_id, message
-    """
-    # TODO: return await create_group_chat(session, data)
-    raise HTTPException(status_code=501, detail="Implementar create_group_chat service")
+@router.put("/{message_id}", response_model=GroupChatResponse)
+def update_message(message_id: uuid.UUID, chat_update: GroupChatUpdate, db: Session = Depends(get_db)):
+    updated = GroupChatService.update_message(db, message_id, chat_update)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Mensaje no encontrado")
+    return updated
 
-@router.get("/")  # TODO: Agregar response_model=list[GroupChatRead]
-async def read_all(session: AsyncSession = Depends(get_session)):
-    """
-    Obtener todos los mensajes de chat grupal.
-    """
-    # TODO: return await get_all_group_chats(session)
-    raise HTTPException(status_code=501, detail="Implementar get_all_group_chats service")
+@router.delete("/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_message(message_id: uuid.UUID, db: Session = Depends(get_db)):
+    deleted = GroupChatService.delete_message(db, message_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Mensaje no encontrado")
+    return
 
-@router.get("/group/{group_id}")  # TODO: Agregar response_model=list[GroupChatRead]
-async def read_by_group(group_id: UUID, session: AsyncSession = Depends(get_session)):
-    """
-    Obtener todos los mensajes de un grupo específico.
-    """
-    # TODO: return await get_group_chats_by_group(session, group_id)
-    raise HTTPException(status_code=501, detail="Implementar get_group_chats_by_group service")
-
-@router.get("/user/{user_id}")  # TODO: Agregar response_model=list[GroupChatRead]
-async def read_by_user(user_id: UUID, session: AsyncSession = Depends(get_session)):
-    """
-    Obtener todos los mensajes de un usuario específico.
-    """
-    # TODO: return await get_group_chats_by_user(session, user_id)
-    raise HTTPException(status_code=501, detail="Implementar get_group_chats_by_user service")
-
-@router.get("/{chat_id}")  # TODO: Agregar response_model=GroupChatRead
-async def read(chat_id: UUID, session: AsyncSession = Depends(get_session)):
-    """
-    Obtener un mensaje específico por ID.
-    """
-    # TODO: Implementar get_group_chat service
-    # group_chat = await get_group_chat(session, chat_id)
-    # if not group_chat:
-    #     raise HTTPException(status_code=404, detail="Mensaje no encontrado")
-    # return group_chat
-    raise HTTPException(status_code=501, detail="Implementar get_group_chat service")
-
-@router.put("/{chat_id}")  # TODO: Agregar response_model=GroupChatRead
-async def update(chat_id: UUID, data: dict, session: AsyncSession = Depends(get_session)):  # TODO: Cambiar dict por GroupChatUpdate
-    """
-    Actualizar un mensaje de chat grupal.
-    Permite actualizar: message, status
-    """
-    # TODO: Implementar update_group_chat service
-    # group_chat = await update_group_chat(session, chat_id, data)
-    # if not group_chat:
-    #     raise HTTPException(status_code=404, detail="Mensaje no encontrado")
-    # return group_chat
-    raise HTTPException(status_code=501, detail="Implementar update_group_chat service")
-
-@router.delete("/{chat_id}")
-async def delete(chat_id: UUID, session: AsyncSession = Depends(get_session)):
-    """
-    Eliminar un mensaje de chat grupal.
-    """
-    # TODO: Implementar delete_group_chat service
-    # success = await delete_group_chat(session, chat_id)
-    # if not success:
-    #     raise HTTPException(status_code=404, detail="Mensaje no encontrado")
-    # return {"ok": True}
-    raise HTTPException(status_code=501, detail="Implementar delete_group_chat service")
+@router.patch("/{message_id}/toggle", response_model=GroupChatResponse)
+def toggle_message_status(message_id: uuid.UUID, db: Session = Depends(get_db)):
+    message = GroupChatService.toggle_status(db, message_id)
+    if not message:
+        raise HTTPException(status_code=404, detail="Mensaje no encontrado")
+    return message

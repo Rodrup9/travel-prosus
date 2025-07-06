@@ -1,54 +1,56 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import AsyncGenerator
-from sqlmodel.ext.asyncio.session import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 from uuid import UUID
+from typing import List
 
-# Reemplaza esto con tu sesión async real
-from app.database import async_session
+from app.schemas.group import GroupCreate, GroupUpdate, GroupOut
+from app.services.group import GroupService
+from app.database import get_db
 
-# Reemplaza esto con tus esquemas reales
-# from app.schemas.group import GroupCreate, GroupRead, GroupUpdate
+router = APIRouter(
+    prefix="/groups",
+    tags=["Groups"]
+)
 
-# Reemplaza esto con tus servicios reales
-# from app.services.group import (
-#     create_group,
-#     get_group,
-#     get_all_groups,
-#     update_group,
-#     delete_group,
-# )
+@router.post("/", response_model=GroupOut)
+def create_group(data: GroupCreate, db: Session = Depends(get_db)):
+    try:
+        return GroupService.create_group(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-router = APIRouter()
+@router.get("/", response_model=List[GroupOut])
+def get_all_groups(db: Session = Depends(get_db)):
+    return GroupService.get_all(db)
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session() as session:
-        yield session
-
-@router.post("/", response_model="GroupRead")  # Reemplaza con: response_model=GroupRead
-async def create(data: "GroupCreate", session: AsyncSession = Depends(get_session)):  # Reemplaza con: data: GroupCreate
-    return await create_group(session, data)
-
-@router.get("/", response_model=list["GroupRead"])  # Reemplaza con: list[GroupRead]
-async def read_all(session: AsyncSession = Depends(get_session)):
-    return await get_all_groups(session)
-
-@router.get("/{group_id}", response_model="GroupRead")  # Reemplaza con: response_model=GroupRead
-async def read(group_id: UUID, session: AsyncSession = Depends(get_session)):
-    group = await get_group(session, group_id)
+@router.get("/{group_id}", response_model=GroupOut)
+def get_group_by_id(group_id: UUID, db: Session = Depends(get_db)):
+    group = GroupService.get_by_id(db, group_id)
     if not group:
         raise HTTPException(status_code=404, detail="Grupo no encontrado")
     return group
 
-@router.put("/{group_id}", response_model="GroupRead")  # Reemplaza con: response_model=GroupRead
-async def update(group_id: UUID, data: "GroupUpdate", session: AsyncSession = Depends(get_session)):  # Reemplaza con: data: GroupUpdate
-    group = await update_group(session, group_id, data)
+@router.get("/user/{user_id}", response_model=List[GroupOut])
+def get_groups_by_user(user_id: UUID, db: Session = Depends(get_db)):
+    return GroupService.get_by_user(db, user_id)
+
+@router.put("/{group_id}", response_model=GroupOut)
+def update_group(group_id: UUID, update: GroupUpdate, db: Session = Depends(get_db)):
+    group = GroupService.update_group(db, group_id, update)
     if not group:
         raise HTTPException(status_code=404, detail="Grupo no encontrado")
     return group
 
 @router.delete("/{group_id}")
-async def delete(group_id: UUID, session: AsyncSession = Depends(get_session)):
-    success = await delete_group(session, group_id)
+def delete_group(group_id: UUID, db: Session = Depends(get_db)):
+    success = GroupService.delete_group(db, group_id)
     if not success:
         raise HTTPException(status_code=404, detail="Grupo no encontrado")
-    return {"ok": True}
+    return {"detail": "Grupo eliminado correctamente"}
+
+@router.patch("/{group_id}/toggle-status", response_model=GroupOut)
+def toggle_group_status(group_id: UUID, db: Session = Depends(get_db)):
+    group = GroupService.toggle_status(db, group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Grupo no encontrado")
+    return group

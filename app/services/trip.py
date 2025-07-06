@@ -1,43 +1,76 @@
-from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select
+# app/services/trip_service.py
+
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.models.trip import Trip
 from app.schemas.trip import TripCreate, TripUpdate
-from uuid import UUID
+from typing import List, Optional
+import uuid
 
-async def create_trip(session: AsyncSession, data: TripCreate) -> Trip:
-    trip = Trip(**data.dict())
-    session.add(trip)
-    await session.commit()
-    await session.refresh(trip)
-    return trip
+class TripService:
 
-async def get_trip(session: AsyncSession, trip_id: UUID) -> Trip | None:
-    result = await session.execute(select(Trip).where(Trip.id == trip_id))
-    return result.scalar_one_or_none()
+    @staticmethod
+    def create_trip(db: Session, trip: TripCreate) -> Trip:
+        db_trip = Trip(
+            id=uuid.uuid4(),
+            group_id=trip.group_id,
+            destination=trip.destination,
+            start_date=trip.start_date,
+            end_date=trip.end_date,
+            status=trip.status
+        )
+        try:
+            db.add(db_trip)
+            db.commit()
+            db.refresh(db_trip)
+            return db_trip
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError(f"Error al crear el viaje: {str(e.orig)}")
 
-async def get_all_trips(session: AsyncSession) -> list[Trip]:
-    result = await session.execute(select(Trip))
-    return result.scalars().all()
+    @staticmethod
+    def get_trip_by_id(db: Session, trip_id: uuid.UUID) -> Optional[Trip]:
+        return db.query(Trip).filter(Trip.id == trip_id).first()
 
-async def get_trips_by_group(session: AsyncSession, group_id: UUID) -> list[Trip]:
-    result = await session.execute(select(Trip).where(Trip.group_id == group_id))
-    return result.scalars().all()
+    @staticmethod
+    def get_all_trips(db: Session, skip: int = 0, limit: int = 100) -> List[Trip]:
+        return db.query(Trip).offset(skip).limit(limit).all()
 
-async def update_trip(session: AsyncSession, trip_id: UUID, data: TripUpdate) -> Trip | None:
-    trip = await get_trip(session, trip_id)
-    if not trip:
-        return None
-    for key, value in data.dict(exclude_unset=True).items():
-        setattr(trip, key, value)
-    session.add(trip)
-    await session.commit()
-    await session.refresh(trip)
-    return trip
+    @staticmethod
+    def update_trip(db: Session, trip_id: uuid.UUID, trip_data: TripUpdate) -> Optional[Trip]:
+        db_trip = db.query(Trip).filter(Trip.id == trip_id).first()
+        if not db_trip:
+            return None
 
-async def delete_trip(session: AsyncSession, trip_id: UUID) -> bool:
-    trip = await get_trip(session, trip_id)
-    if not trip:
-        return False
-    await session.delete(trip)
-    await session.commit()
-    return True
+        update_data = trip_data.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_trip, field, value)
+
+        try:
+            db.commit()
+            db.refresh(db_trip)
+            return db_trip
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError(f"Error al actualizar el viaje: {str(e.orig)}")
+
+    @staticmethod
+    def delete_trip(db: Session, trip_id: uuid.UUID) -> bool:
+        db_trip = db.query(Trip).filter(Trip.id == trip_id).first()
+        if not db_trip:
+            return False
+
+        db.delete(db_trip)
+        db.commit()
+        return True
+
+    @staticmethod
+    def toggle_status(db: Session, trip_id: uuid.UUID) -> Optional[Trip]:
+        db_trip = db.query(Trip).filter(Trip.id == trip_id).first()
+        if not db_trip:
+            return None
+
+        db_trip.status = not db_trip.status
+        db.commit()
+        db.refresh(db_trip)
+        return db_trip

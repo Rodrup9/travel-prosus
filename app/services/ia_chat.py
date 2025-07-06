@@ -1,47 +1,90 @@
-from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select
-from app.models.ia_chat import IaChat
-from app.schemas.ia_chat import IaChatCreate, IaChatUpdate
-from uuid import UUID
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from app.models.ia_chat import IAChat
+from app.models.user import User
+from app.models.group import Group
+from app.schemas.ia_chat import IAChatCreate, IAChatUpdate
+from typing import Optional, List
+import uuid
 
-async def create_ia_chat(session: AsyncSession, data: IaChatCreate) -> IaChat:
-    ia_chat = IaChat(**data.dict())
-    session.add(ia_chat)
-    await session.commit()
-    await session.refresh(ia_chat)
-    return ia_chat
+class IAChatService:
 
-async def get_ia_chat(session: AsyncSession, chat_id: UUID) -> IaChat | None:
-    result = await session.execute(select(IaChat).where(IaChat.id == chat_id))
-    return result.scalar_one_or_none()
+    @staticmethod
+    def create_message(db: Session, chat_data: IAChatCreate) -> IAChat:
+        db_chat = IAChat(
+            id=uuid.uuid4(),
+            user_id=chat_data.user_id,
+            group_id=chat_data.group_id,
+            message=chat_data.message,
+            status=chat_data.status
+        )
+        try:
+            db.add(db_chat)
+            db.commit()
+            db.refresh(db_chat)
+            return db_chat
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError("Error al crear mensaje: " + str(e.orig))
 
-async def get_all_ia_chats(session: AsyncSession) -> list[IaChat]:
-    result = await session.execute(select(IaChat))
-    return result.scalars().all()
+    @staticmethod
+    def get_message_by_id(db: Session, message_id: uuid.UUID) -> Optional[IAChat]:
+        return db.query(IAChat).filter(IAChat.id == message_id).first()
 
-async def get_ia_chats_by_group(session: AsyncSession, group_id: UUID) -> list[IaChat]:
-    result = await session.execute(select(IaChat).where(IaChat.group_id == group_id))
-    return result.scalars().all()
+    @staticmethod
+    def get_all_messages(db: Session, skip: int = 0, limit: int = 100) -> List[IAChat]:
+        return db.query(IAChat).offset(skip).limit(limit).all()
 
-async def get_ia_chats_by_user(session: AsyncSession, user_id: UUID) -> list[IaChat]:
-    result = await session.execute(select(IaChat).where(IaChat.user_id == user_id))
-    return result.scalars().all()
+    @staticmethod
+    def update_message(db: Session, message_id: uuid.UUID, chat_update: IAChatUpdate) -> Optional[IAChat]:
+        db_chat = db.query(IAChat).filter(IAChat.id == message_id).first()
+        if not db_chat:
+            return None
 
-async def update_ia_chat(session: AsyncSession, chat_id: UUID, data: IaChatUpdate) -> IaChat | None:
-    ia_chat = await get_ia_chat(session, chat_id)
-    if not ia_chat:
-        return None
-    for key, value in data.dict(exclude_unset=True).items():
-        setattr(ia_chat, key, value)
-    session.add(ia_chat)
-    await session.commit()
-    await session.refresh(ia_chat)
-    return ia_chat
+        update_data = chat_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_chat, field, value)
 
-async def delete_ia_chat(session: AsyncSession, chat_id: UUID) -> bool:
-    ia_chat = await get_ia_chat(session, chat_id)
-    if not ia_chat:
-        return False
-    await session.delete(ia_chat)
-    await session.commit()
-    return True
+        try:
+            db.commit()
+            db.refresh(db_chat)
+            return db_chat
+        except IntegrityError:
+            db.rollback()
+            raise ValueError("Error al actualizar mensaje")
+
+    @staticmethod
+    def delete_message(db: Session, message_id: uuid.UUID) -> bool:
+        db_chat = db.query(IAChat).filter(IAChat.id == message_id).first()
+        if not db_chat:
+            return False
+
+        db.delete(db_chat)
+        db.commit()
+        return True
+
+    @staticmethod
+    def toggle_status(db: Session, message_id: uuid.UUID) -> Optional[IAChat]:
+        db_chat = db.query(IAChat).filter(IAChat.id == message_id).first()
+        if not db_chat:
+            return None
+
+        db_chat.status = not db_chat.status
+        db.commit()
+        db.refresh(db_chat)
+        return db_chat
+
+    @staticmethod
+    def get_messages_by_user(db: Session, user_id: uuid.UUID) -> List[IAChat]:
+        return db.query(IAChat).filter(IAChat.user_id == user_id).all()
+
+    @staticmethod
+    def get_messages_by_group(db: Session, group_id: uuid.UUID) -> List[IAChat]:
+        return db.query(IAChat).filter(IAChat.group_id == group_id).all()
+
+    @staticmethod
+    def get_messages_by_user_and_group(db: Session, user_id: uuid.UUID, group_id: uuid.UUID) -> List[IAChat]:
+        return db.query(IAChat).filter(
+            IAChat.user_id == user_id,
+            IAChat.group_id == group_id
+        ).all()
