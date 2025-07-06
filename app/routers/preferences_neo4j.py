@@ -11,7 +11,7 @@ from app.models.preference import PreferencesModel
 from app.database import get_db
 from sqlalchemy.orm import Session
 import textwrap
-
+from app.middleware.verify_session import get_verify_session
 
 
 router = APIRouter()
@@ -58,7 +58,7 @@ async def obtener_preferencias_usuarios(
 
 
 @router.post("/preferences/users")
-def create_preferences_user(data:PreferencesModel):
+def create_preferences_user(data:PreferencesModel,current_user = Depends(get_verify_session),db: Session = Depends(get_db)):
     """
     Create prefereces for a user
     Args:
@@ -68,25 +68,32 @@ def create_preferences_user(data:PreferencesModel):
     Returns:
         array of preferences
     """
+    user = UserService.get_user_by_id(db,current_user.id)
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail=f"User not found"
+        )
+    
     parts = []
 
     parts.append(textwrap.dedent(f"""
-        MERGE ({data.name_user}:User {{id:'u{data.user_id}', name:'{data.name_user.capitalize()}'}})
-        WITH {data.name_user}
+        MERGE ({user.name}:User {{id:'u{user.id}', name:'{user.name.capitalize()}'}})
+        WITH {user.name}
     """).strip())
 
     index = 1
     for preference in data.preferences:
         parts.append(textwrap.dedent(f"""
             MERGE (p{index}:Preference {{name: '{preference.name}'}})
-            MERGE ({data.name_user})-[:HAS_PREFERENCE_{preference.type}]->(p{index})
-            WITH {data.name_user}
+            MERGE ({user.name})-[:HAS_PREFERENCE_{preference.type}]->(p{index})
+            WITH {user.name}
         """).strip())
         index += 1
 
     parts.append(textwrap.dedent(f"""
-        MERGE (ID_SQL:id {{name: '{data.user_id}'}})
-        MERGE ({data.name_user})-[:ID_SQL]->(ID_SQL);
+        MERGE (ID_SQL:id {{name: '{user.id}'}})
+        MERGE ({user.name})-[:ID_SQL]->(ID_SQL);
     """).strip())
 
     query = "\n".join(parts)

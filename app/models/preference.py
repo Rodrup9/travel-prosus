@@ -6,6 +6,4 @@ class PreferenceList(BaseModel):
 
 
 class PreferencesModel(BaseModel):
-  user_id:str
-  name_user:str
   preferences:list[PreferenceList]

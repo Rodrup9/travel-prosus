@@ -8,11 +8,11 @@ import uuid
 from app.database import get_db
 from app.schemas.vote import VoteCreate, VoteUpdate, VoteResponse
 from app.services.vote import VoteService
-
+from app.middleware.verify_session import get_verify_session
 router = APIRouter(prefix="/votes", tags=["Votes"])
 
 @router.post("/", response_model=VoteResponse, status_code=status.HTTP_201_CREATED)
-def create_vote(vote: VoteCreate, db: Session = Depends(get_db)):
+def create_vote(vote: VoteCreate,current_user = Depends(get_verify_session), db: Session = Depends(get_db)):
     try:
         return VoteService.create_vote(db, vote)
     except ValueError as e:
@@ -30,20 +30,20 @@ def get_vote_by_id(vote_id: uuid.UUID, db: Session = Depends(get_db)):
     return vote
 
 @router.put("/{vote_id}", response_model=VoteResponse)
-def update_vote(vote_id: uuid.UUID, vote_update: VoteUpdate, db: Session = Depends(get_db)):
+def update_vote(vote_id: uuid.UUID, vote_update: VoteUpdate,current_user = Depends(get_verify_session), db: Session = Depends(get_db)):
     vote = VoteService.update_vote(db, vote_id, vote_update)
     if not vote:
         raise HTTPException(status_code=404, detail="Voto no encontrado")
     return vote
 
 @router.delete("/{vote_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_vote(vote_id: uuid.UUID, db: Session = Depends(get_db)):
+def delete_vote(vote_id: uuid.UUID,current_user = Depends(get_verify_session), db: Session = Depends(get_db)):
     success = VoteService.delete_vote(db, vote_id)
     if not success:
         raise HTTPException(status_code=404, detail="Voto no encontrado")
 
 @router.patch("/{vote_id}/toggle", response_model=VoteResponse)
-def toggle_vote_status(vote_id: uuid.UUID, db: Session = Depends(get_db)):
+def toggle_vote_status(vote_id: uuid.UUID,current_user = Depends(get_verify_session), db: Session = Depends(get_db)):
     vote = VoteService.toggle_vote_status(db, vote_id)
     if not vote:
         raise HTTPException(status_code=404, detail="Voto no encontrado")
