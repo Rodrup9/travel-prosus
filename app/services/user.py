@@ -4,14 +4,23 @@ from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
 from typing import Optional, List
 import uuid
-
+from app.supabaseClient import get_supabase_client
 class UserService:
     
     @staticmethod
     def create_user(db: Session, user: UserCreate) -> User:
         """Crear un nuevo usuario"""
+        supabase = get_supabase_client()
+        response = supabase.auth.sign_up({
+            "email": user.email,
+            "password": user.password
+        })
+        print(response)
+        if not response.user:
+            raise ValueError("Error al crear el usuario")
+        
         db_user = User(
-            id=uuid.uuid4(),
+            id=response.user.id,
             name=user.name,
             email=user.email,
             status=user.status,

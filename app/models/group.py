@@ -27,5 +27,5 @@ class Group(Base):
     host = relationship("User", back_populates="groups")
     members = relationship("GroupMember", back_populates="group")
     chats = relationship("GroupChat", back_populates="group")
-    ia_chats = relationship("IaChat", back_populates="group")
+    ia_chats = relationship("IAChat", back_populates="group")
     trips = relationship("Trip", back_populates="group")
