@@ -35,10 +35,6 @@ class GroupMemberService:
         return db.query(GroupMember).offset(skip).limit(limit).all()
 
     @staticmethod
-    def get_members_by_group(db: Session, group_id: uuid.UUID) -> List[GroupMember]:
-        return db.query(GroupMember).filter(GroupMember.group_id == group_id).all()
-
-    @staticmethod
     def get_members_by_user(db: Session, user_id: uuid.UUID) -> List[GroupMember]:
         return db.query(GroupMember).filter(GroupMember.user_id == user_id).all()
 
