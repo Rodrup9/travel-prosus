@@ -7,6 +7,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from typing import TYPE_CHECKING, List
 if TYPE_CHECKING:
     from app.models.group import Group
+    from app.models.group_member import GroupMember
+    from app.models.group_chat import GroupChat
+    from app.models.ia_chat import IAChat
+    from app.models.vote import Vote
 
 class User(Base):
     __tablename__ = "users"

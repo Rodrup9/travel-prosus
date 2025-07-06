@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from app.routers import users, groups, trips, itineraries, flights, hotels, votes, group_chat, group_members, ia_chat, auth
+from app.routers import users, groups, trips, itineraries, flights, hotels, votes, group_chat, group_members, ia_chat, auth, websocket_chat
 from app.database import init_db, engine
 # from app.neo4j_client import Neo4jClient
 from app.routers import preferences_neo4j
@@ -29,6 +29,7 @@ app.include_router(group_members.router, prefix="/groups", tags=["Group Members"
 app.include_router(ia_chat.router, prefix="/ia_chat", tags=["IA Chat"])
 app.include_router(preferences_neo4j.router)
 app.include_router(auth.router)
+app.include_router(websocket_chat.router, tags=["WebSocket Chat"])
 
 
 @app.get("/pool-status")

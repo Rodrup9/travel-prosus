@@ -21,7 +21,7 @@ def create_group(data: GroupCreate, db: Session = Depends(get_db)):
 
 @router.get("/", response_model=List[GroupOut])
 def get_all_groups(db: Session = Depends(get_db)):
-    return GroupService.get_all(db)
+    return GroupService.get_groups(db)
 
 @router.get("/{group_id}", response_model=GroupOut)
 def get_group_by_id(group_id: UUID, db: Session = Depends(get_db)):

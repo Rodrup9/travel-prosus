@@ -11,7 +11,6 @@ class GroupService:
     @staticmethod
     def create_group(db: Session, group: GroupCreate) -> Group:
         user = db.query(User).filter(User.id == group.host_id).first()
-        print(user.id)
         if not user:
             raise ValueError("El host_id no existe en la tabla users")
         db_group = Group(
@@ -35,8 +34,16 @@ class GroupService:
         return db.query(Group).filter(Group.id == group_id).first()
     
     @staticmethod
+    def get_by_id(db: Session, group_id: uuid.UUID) -> Optional[Group]:
+        return db.query(Group).filter(Group.id == group_id).first()
+    
+    @staticmethod
     def get_groups(db: Session, skip: int = 0, limit: int = 100) -> List[Group]:
         return db.query(Group).offset(skip).limit(limit).all()
+    
+    @staticmethod
+    def get_by_user(db: Session, user_id: uuid.UUID) -> List[Group]:
+        return db.query(Group).filter(Group.host_id == user_id).all()
     
     @staticmethod
     def update_group(db: Session, group_id: uuid.UUID, group_update: GroupUpdate) -> Optional[Group]:
