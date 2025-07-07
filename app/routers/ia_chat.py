@@ -2,11 +2,78 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.schemas.ia_chat import IAChatCreate, IAChatUpdate, IAChatResponse
 from app.services.ia_chat import IAChatService
-from app.database import get_db
+from app.database import get_db, engine
 import uuid
-from typing import List
+from typing import List, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import sessionmaker
+from app.services.chat_service import ChatService
+from ai_agent.agent_service import TripPlannerAgent
+from pydantic import BaseModel
+from datetime import datetime
+import groq
+from fastapi.concurrency import run_in_threadpool
+from sqlalchemy.sql import select
+from app.models.ia_chat import IAChat
+from app.models.group import Group
+from app.models.user import User
+from app.models.group_chat import GroupChat
+from dotenv import load_dotenv, dotenv_values
+import os
 
 router = APIRouter(prefix="/ia_chat", tags=["IA Chat"])
+
+# Cargar configuración
+def get_settings():
+    # Debug: Mostrar información sobre el archivo .env
+    current_dir = os.getcwd()
+    env_path = os.path.join(current_dir, ".env")
+    print(f"\n=== Debug: Información del archivo .env ===")
+    print(f"Directorio actual: {current_dir}")
+    print(f"Ruta del .env: {env_path}")
+    print(f"¿Existe el archivo?: {os.path.exists(env_path)}")
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            first_line = f.readline().strip()
+            print(f"Primera línea del archivo: {first_line}")
+    print("==========================================\n")
+    
+    env_values = dotenv_values(".env")
+    return {
+        "GROQ_API_KEY": env_values.get("GROQ_API_KEY", ""),
+        "MODEL_NAME": "llama-3.1-8b-instant",
+        "TEMPERATURE": 0.7,
+        "MAX_TOKENS": 4096,
+        "TOOLS_ENABLED": True,
+        "JSON_MODE": True,
+        "AMADEUS_API_KEY": env_values.get("AMADEUS_API_KEY", ""),
+        "AMADEUS_API_SECRET": env_values.get("AMADEUS_API_SECRET", ""),
+        "WEATHER_API_KEY": None,
+        "WEB_SEARCH_ENABLED": True
+    }
+
+async def validate_user_and_group(db: AsyncSession, user_id: uuid.UUID, group_id: uuid.UUID) -> bool:
+    """Valida que el usuario y grupo existan en group_chat"""
+    stmt = select(GroupChat).where(
+        GroupChat.user_id == user_id,
+        GroupChat.group_id == group_id,
+        GroupChat.status == True
+    )
+    result = await db.execute(stmt)
+    return result.first() is not None
+
+@router.get("/test-config")
+async def test_config():
+    """
+    Endpoint de prueba para verificar la configuración
+    """
+    try:
+        config = get_settings()
+        return {"message": "Configuración cargada correctamente", "config": config}
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        return {"message": "Error cargando configuración", "error": str(e), "detail": error_detail}
 
 @router.post("/", response_model=IAChatResponse, status_code=status.HTTP_201_CREATED)
 def create_message(chat: IAChatCreate, db: Session = Depends(get_db)):
@@ -58,3 +125,154 @@ def get_messages_by_group(group_id: uuid.UUID, db: Session = Depends(get_db)):
 @router.get("/user/{user_id}/group/{group_id}", response_model=List[IAChatResponse])
 def get_messages_by_user_and_group(user_id: uuid.UUID, group_id: uuid.UUID, db: Session = Depends(get_db)):
     return IAChatService.get_messages_by_user_and_group(db, user_id, group_id)
+
+class ChatRequest(BaseModel):
+    message: str
+    user_id: uuid.UUID
+    group_id: uuid.UUID
+
+class ChatResponse(BaseModel):
+    id: uuid.UUID
+    message: str
+    created_at: datetime
+    user_id: uuid.UUID
+    group_id: uuid.UUID
+
+# Crear un sessionmaker para sesiones síncronas
+SyncSessionLocal = sessionmaker(
+    bind=engine.sync_engine,
+    class_=Session,
+    expire_on_commit=False
+)
+
+def get_sync_db():
+    db = SyncSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@router.post("/send-message", response_model=ChatResponse)
+async def send_message_to_agent(
+    chat_request: ChatRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Envía un mensaje al agente y obtiene su respuesta.
+    """
+    try:
+        # Validar que el usuario y grupo existan
+        is_valid = await validate_user_and_group(db, chat_request.user_id, chat_request.group_id)
+        if not is_valid:
+            raise HTTPException(
+                status_code=400,
+                detail="El usuario no pertenece al grupo o el grupo no existe"
+            )
+
+        # Cargar configuración fresca
+        settings = get_settings()
+        
+        # Debug: Imprimir configuración
+        print("=== Configuración de Groq ===")
+        print(f"API Key: {settings['GROQ_API_KEY']}")
+        print(f"Model Name: {settings['MODEL_NAME']}")
+        print(f"Temperature: {settings['TEMPERATURE']}")
+        print(f"Max Tokens: {settings['MAX_TOKENS']}")
+        print(f"Tools Enabled: {settings['TOOLS_ENABLED']}")
+        print(f"JSON Mode: {settings['JSON_MODE']}")
+        print("=== Otras configuraciones ===")
+        print(f"Amadeus API Key: {settings['AMADEUS_API_KEY']}")
+        print(f"Amadeus API Secret: {settings['AMADEUS_API_SECRET']}")
+        print(f"Weather API Key: {settings['WEATHER_API_KEY']}")
+        print(f"Web Search Enabled: {settings['WEB_SEARCH_ENABLED']}")
+        print("========================")
+
+        # Guardar el mensaje del usuario
+        user_message = IAChat(
+            user_id=chat_request.user_id,
+            group_id=chat_request.group_id,
+            message=chat_request.message
+        )
+        db.add(user_message)
+        await db.flush()
+        
+        # Obtener mensajes del chat
+        stmt = select(IAChat).where(
+            IAChat.group_id == chat_request.group_id,
+            IAChat.status == True
+        ).order_by(IAChat.created_at.desc()).limit(10)
+        result = await db.execute(stmt)
+        chat_history = result.scalars().all()
+
+        # Obtener información del grupo
+        stmt = select(Group).where(Group.id == chat_request.group_id)
+        result = await db.execute(stmt)
+        group = result.scalar_one_or_none()
+        group_context = {
+            "group": {
+                "id": str(group.id) if group else None,
+                "name": group.name if group else "Grupo sin nombre",
+                "host_id": str(group.host_id) if group else None
+            }
+        }
+    
+        # Construir el prompt para el agente
+        prompt = f"""Como asistente de viajes, ayuda a responder este mensaje considerando el contexto del grupo:
+
+Mensaje actual: {chat_request.message}
+
+Contexto del grupo:
+{group_context.get('group', {}).get('name', 'Grupo sin nombre')}
+
+Historial reciente:
+{chr(10).join([f"{msg.user_id}: {msg.message}" for msg in chat_history])}
+
+Por favor, proporciona una respuesta útil y relevante que ayude a planificar el viaje."""
+
+        # Crear cliente Groq y obtener respuesta
+        from groq import Groq
+        client = Groq(api_key=settings['GROQ_API_KEY'])
+        completion = await run_in_threadpool(
+            lambda: client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "Eres un asistente experto en planificación de viajes, especializado en ayudar a grupos a organizar sus viajes."},
+                    {"role": "user", "content": prompt}
+                ],
+                model=settings['MODEL_NAME'],
+                temperature=settings['TEMPERATURE'],
+                max_tokens=settings['MAX_TOKENS']
+            )
+        )
+        
+        # Extraer la respuesta
+        agent_response = completion.choices[0].message.content
+        
+        # Guardar la respuesta del agente usando el ID del usuario que envió el mensaje
+        agent_message = IAChat(
+            user_id=chat_request.user_id,  # Usar el mismo usuario que envió el mensaje
+            group_id=chat_request.group_id,
+            message=agent_response
+        )
+        db.add(agent_message)
+        await db.flush()  # Asegurarnos de que tenemos el ID y created_at
+        await db.commit()  # Commit explícito para guardar todos los cambios
+    
+        return ChatResponse(
+            id=agent_message.id,
+            message=agent_message.message,
+            created_at=agent_message.created_at,
+            user_id=agent_message.user_id,
+            group_id=agent_message.group_id
+        )
+            
+    except Exception as e:
+        await db.rollback()  # Rollback en caso de error
+        # Debug: Imprimir el error completo
+        import traceback
+        print("=== Error Detallado ===")
+        print(traceback.format_exc())
+        print("=====================")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error procesando el mensaje: {str(e)}"
+        )

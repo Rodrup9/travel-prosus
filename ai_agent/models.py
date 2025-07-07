@@ -1,9 +1,11 @@
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 import uuid
 
 class UserPreferences(BaseModel):
+    model_config = ConfigDict(extra='allow')
+    
     user_id: uuid.UUID
     name: str
     destinations: List[str]
