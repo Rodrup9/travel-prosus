@@ -365,7 +365,7 @@
 
         async function loadGroups() {
             try {
-                const response = await fetch('http://localhost:8000/chat/groups');
+                const response = await fetch('http://localhost:8000/groups/groups/');
                 if (!response.ok) {
                     throw new Error(`Error HTTP: ${response.status}`);
                 }
@@ -392,7 +392,7 @@
 
         async function loadUsers() {
             try {
-                const response = await fetch('http://localhost:8000/chat/users');
+                const response = await fetch('http://localhost:8000/users');
                 if (!response.ok) {
                     throw new Error(`Error HTTP: ${response.status}`);
                 }

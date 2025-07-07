@@ -134,34 +134,6 @@ async def get_active_connections(group_id: str):
         "active_connections": len(connections)
     }
 
-@router.get("/chat/groups", response_model=List[dict])
-async def get_available_groups(db: Session = Depends(get_db)):
-    """Obtener todos los grupos disponibles para el chat"""
-    groups = db.query(Group).filter(Group.status == True).all()
-    return [
-        {
-            "id": str(group.id),
-            "name": group.name,
-            "host_id": str(group.host_id),
-            "created_at": str(group.created_at)
-        }
-        for group in groups
-    ]
-
-@router.get("/chat/users", response_model=List[dict])
-async def get_available_users(db: Session = Depends(get_db)):
-    """Obtener todos los usuarios disponibles para el chat"""
-    users = db.query(User).filter(User.status == True).all()
-    return [
-        {
-            "id": str(user.id),
-            "name": user.name,
-            "email": user.email,
-            "avatar_url": user.avatar_url
-        }
-        for user in users
-    ]
-
 @router.get("/chat/groups/{group_id}/members", response_model=List[dict])
 async def get_group_members(group_id: str, db: Session = Depends(get_db)):
     """Obtener miembros de un grupo específico"""
