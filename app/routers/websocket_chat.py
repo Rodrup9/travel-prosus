@@ -38,6 +38,10 @@ async def websocket_endpoint(websocket: WebSocket, group_id: str):
                 try:
                     new_message = GroupChatService.create_message(db, chat_create)
                     
+                    # Obtener información del usuario
+                    user = db.query(User).filter(User.id == new_message.user_id).first()
+                    user_name = user.name if user else "Usuario desconocido"
+                    
                     # Crear respuesta para confirmar el mensaje
                     response = {
                         "type": "message_sent",
@@ -46,8 +50,9 @@ async def websocket_endpoint(websocket: WebSocket, group_id: str):
                             "user_id": str(new_message.user_id),
                             "group_id": str(new_message.group_id),
                             "message": new_message.message,
-                            "created_at": new_message.created_at.strftime("%Y-%m-%dT%H:%M:%S"),
-                            "status": new_message.status
+                            "created_at": new_message.created_at.isoformat(),
+                            "status": new_message.status,
+                            "user_name": user_name
                         }
                     }
                     
@@ -55,6 +60,20 @@ async def websocket_endpoint(websocket: WebSocket, group_id: str):
                     await realtime_manager.send_personal_message(
                         json.dumps(response), 
                         websocket
+                    )
+                    
+                    # Broadcast del nuevo mensaje a todos los clientes del grupo
+                    await realtime_manager.broadcast_new_message(
+                        {
+                            "id": str(new_message.id),
+                            "user_id": str(new_message.user_id),
+                            "group_id": str(new_message.group_id),
+                            "message": new_message.message,
+                            "created_at": new_message.created_at.isoformat(),
+                            "status": new_message.status,
+                            "user_name": user_name
+                        },
+                        group_id
                     )
                     
                 except Exception as e:
@@ -114,34 +133,6 @@ async def get_active_connections(group_id: str):
         "group_id": group_id,
         "active_connections": len(connections)
     }
-
-@router.get("/chat/groups", response_model=List[dict])
-async def get_available_groups(db: Session = Depends(get_db)):
-    """Obtener todos los grupos disponibles para el chat"""
-    groups = db.query(Group).filter(Group.status == True).all()
-    return [
-        {
-            "id": str(group.id),
-            "name": group.name,
-            "host_id": str(group.host_id),
-            "created_at": str(group.created_at)
-        }
-        for group in groups
-    ]
-
-@router.get("/chat/users", response_model=List[dict])
-async def get_available_users(db: Session = Depends(get_db)):
-    """Obtener todos los usuarios disponibles para el chat"""
-    users = db.query(User).filter(User.status == True).all()
-    return [
-        {
-            "id": str(user.id),
-            "name": user.name,
-            "email": user.email,
-            "avatar_url": user.avatar_url
-        }
-        for user in users
-    ]
 
 @router.get("/chat/groups/{group_id}/members", response_model=List[dict])
 async def get_group_members(group_id: str, db: Session = Depends(get_db)):

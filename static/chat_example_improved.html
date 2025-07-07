@@ -18,6 +18,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 20px;
         }
 
         .chat-container {
@@ -351,7 +352,8 @@
         let chatClient = null;
         let groups = [];
         let users = [];
-        const API_BASE = 'http://localhost:8000';
+        let currentUserId = null;
+        let currentGroupId = null;
 
         // Cargar datos al iniciar
         window.addEventListener('load', async () => {
@@ -363,7 +365,7 @@
 
         async function loadGroups() {
             try {
-                const response = await fetch(`${API_BASE}/chat/groups`);
+                const response = await fetch('http://localhost:8000/groups/groups/');
                 if (!response.ok) {
                     throw new Error(`Error HTTP: ${response.status}`);
                 }
@@ -390,7 +392,7 @@
 
         async function loadUsers() {
             try {
-                const response = await fetch(`${API_BASE}/chat/users`);
+                const response = await fetch('http://localhost:8000/users');
                 if (!response.ok) {
                     throw new Error(`Error HTTP: ${response.status}`);
                 }
@@ -445,14 +447,15 @@
         function startChat() {
             const groupId = document.getElementById('group-select').value;
             const userId = document.getElementById('user-select').value;
-            const serverUrl = document.getElementById('server-url').value;
 
             if (!groupId || !userId) {
                 showError('Por favor selecciona un grupo y un usuario');
                 return;
             }
 
-            // Obtener nombres para mostrar
+            currentGroupId = groupId;
+            currentUserId = userId;
+
             const selectedGroup = groups.find(g => g.id === groupId);
             const selectedUser = users.find(u => u.id === userId);
 
@@ -464,13 +467,10 @@
             });
 
             // Crear cliente de chat
-            chatClient = new RealtimeChatClient(groupId, userId, serverUrl.replace('ws://', 'http://').replace('https://', 'ws://'));
+            chatClient = new WebSocket(`ws://localhost:8000/ws/chat/${groupId}`);
 
             // Configurar manejadores de eventos
-            setupEventHandlers();
-
-            // Conectar al chat
-            chatClient.connect();
+            setupWebSocketHandlers();
 
             // Mostrar chat y ocultar formulario
             document.getElementById('setup-form').classList.add('hidden');
@@ -480,58 +480,86 @@
             document.querySelector('.chat-header h2').textContent = `Chat: ${selectedGroup?.name}`;
         }
 
-        function setupEventHandlers() {
-            // Manejar nuevos mensajes
-            chatClient.onMessage('new_message', (data) => {
-                const userName = users.find(u => u.id === data.user_id)?.name || 'Usuario';
-                addMessage(data, false, userName);
-            });
-
-            // Manejar mensajes enviados
-            chatClient.onMessage('message_sent', (data) => {
-                const userName = users.find(u => u.id === data.user_id)?.name || 'Tú';
-                addMessage(data, true, userName);
-            });
-
-            // Manejar usuarios escribiendo
-            chatClient.onMessage('user_typing', (data) => {
-                const userName = users.find(u => u.id === data.user_id)?.name || 'Usuario';
-                showTypingIndicator(userName);
-            });
-
-            // Manejar usuarios que dejaron de escribir
-            chatClient.onMessage('user_stop_typing', (data) => {
-                hideTypingIndicator();
-            });
-
-            // Manejar errores
-            chatClient.onMessage('error', (data) => {
-                addSystemMessage(`Error: ${data.message}`);
-            });
-
-            // Manejar cambios de conexión
-            chatClient.onConnection('connected', () => {
+        function setupWebSocketHandlers() {
+            chatClient.onopen = () => {
+                console.log('Conectado al chat');
                 updateConnectionStatus(true);
                 addSystemMessage('Conectado al chat');
-            });
+            };
 
-            chatClient.onConnection('disconnected', () => {
+            chatClient.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                handleWebSocketMessage(message);
+            };
+
+            chatClient.onclose = () => {
+                console.log('Desconectado del chat');
                 updateConnectionStatus(false);
                 addSystemMessage('Desconectado del chat');
-            });
+            };
 
-            chatClient.onConnection('error', (error) => {
+            chatClient.onerror = (error) => {
+                console.error('Error en WebSocket:', error);
                 updateConnectionStatus(false);
                 addSystemMessage('Error de conexión');
-            });
+            };
         }
 
-        function addMessage(data, isOwn, userName) {
+        function handleWebSocketMessage(message) {
+            console.log('Mensaje recibido:', message);
+            
+            switch (message.type) {
+                case 'message_history':
+                    // Cargar mensajes anteriores
+                    const messages = message.data;
+                    const messagesContainer = document.getElementById('chat-messages');
+                    messagesContainer.innerHTML = '';
+                    
+                    if (messages.length === 0) {
+                        addSystemMessage('No hay mensajes anteriores');
+                    } else {
+                        messages.forEach(msg => {
+                            addMessage(msg, msg.user_id === currentUserId);
+                        });
+                    }
+                    break;
+                    
+                case 'new_message':
+                    // Nuevo mensaje en tiempo real - solo mostrar si NO es del usuario actual
+                    if (message.data.user_id !== currentUserId) {
+                        addMessage(message.data, false);
+                    }
+                    break;
+                    
+                case 'message_sent':
+                    // Confirmación de mensaje enviado - mostrar como propio
+                    addMessage(message.data, true);
+                    break;
+                    
+                case 'user_typing':
+                    showTypingIndicator();
+                    break;
+                    
+                case 'user_stop_typing':
+                    hideTypingIndicator();
+                    break;
+                    
+                case 'error':
+                    showError(message.message);
+                    break;
+                    
+                default:
+                    console.log('Tipo de mensaje no manejado:', message.type);
+            }
+        }
+
+        function addMessage(data, isOwn) {
             const messagesContainer = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
             
             const time = new Date(data.created_at).toLocaleTimeString();
+            const userName = users.find(u => u.id === data.user_id)?.name || 'Usuario';
             
             messageDiv.innerHTML = `
                 <div class="message-content">
@@ -547,22 +575,14 @@
         function addSystemMessage(message) {
             const messagesContainer = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
-            messageDiv.className = 'message other';
-            
-            messageDiv.innerHTML = `
-                <div class="message-content">
-                    <div style="color: #666; font-style: italic;">${escapeHtml(message)}</div>
-                    <div class="message-info">Sistema • ${new Date().toLocaleTimeString()}</div>
-                </div>
-            `;
-            
+            messageDiv.className = 'system-message';
+            messageDiv.textContent = message;
             messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        function showTypingIndicator(userName) {
+        function showTypingIndicator() {
             const indicator = document.getElementById('typing-indicator');
-            indicator.textContent = `${userName} está escribiendo...`;
             indicator.classList.remove('hidden');
         }
 
@@ -586,8 +606,16 @@
             const messageInput = document.getElementById('message-input');
             const message = messageInput.value.trim();
             
-            if (message && chatClient) {
-                chatClient.sendMessage(message);
+            if (message && chatClient && chatClient.readyState === WebSocket.OPEN) {
+                const messageData = {
+                    type: 'send_message',
+                    data: {
+                        user_id: currentUserId,
+                        message: message
+                    }
+                };
+                
+                chatClient.send(JSON.stringify(messageData));
                 messageInput.value = '';
             }
         }
@@ -599,8 +627,14 @@
         }
 
         function handleTyping() {
-            if (chatClient) {
-                chatClient.handleTyping();
+            if (chatClient && chatClient.readyState === WebSocket.OPEN) {
+                const typingData = {
+                    type: 'typing',
+                    data: {
+                        user_id: currentUserId
+                    }
+                };
+                chatClient.send(JSON.stringify(typingData));
             }
         }
 
@@ -617,7 +651,7 @@
         // Desconectar al salir
         window.addEventListener('beforeunload', () => {
             if (chatClient) {
-                chatClient.disconnect();
+                chatClient.close();
             }
         });
     </script>
