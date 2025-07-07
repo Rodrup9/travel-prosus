@@ -1,6 +1,6 @@
 from typing import List, Optional
 from app.neo4j_client import Neo4jClient
-from models.preferences import UserPreferenceBase, UserPreferenceResponse
+from app.models.preferences import UserPreferenceBase, UserPreferenceResponse
 
 class PreferenceService:
     def __init__(self):

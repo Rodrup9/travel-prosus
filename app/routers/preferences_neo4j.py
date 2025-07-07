@@ -1,14 +1,23 @@
 # routers/preferences.py
 
-from fastapi import APIRouter, Query
-from models.preferences import UserPreferenceResponse
+from fastapi import APIRouter, Query, HTTPException
+from app.models.preferences import UserPreferenceResponse
 from typing import List, Optional
 import app.neo4j_client as neo4j_client
 from app.services.preference_service import PreferenceService
 from app.neo4j_client import Neo4jClient
-from models.preference import PreferencesModel
+from app.models.preference import PreferencesModel
 import textwrap
+from supabase import create_client, Client
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
+
+# Configuración de Supabase
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
 router = APIRouter()
 preference_service = PreferenceService()
 neo4j_client = Neo4jClient()
@@ -63,3 +72,17 @@ def create_preferences_user(data:PreferencesModel):
         print(e)
         return {"error": str(e)}
 
+@router.get("/all/users")
+async def get_preferences_user():
+    try:
+        # Obtener todos los usuarios de Supabase
+        
+        response = (supabase.table("users").select("*").execute())
+        print(response)
+        return {
+            "all_users": response,
+        }
+        
+    except Exception as e:
+        print(f"Error en get_preferences_user: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
