@@ -1,35 +1,41 @@
 # database.py
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import QueuePool
 import os
 
 # URL de la base de datos
-# SUPABASE_URL = os.getenv("SUPABASE_URL");
-DATABASE_URL = os.getenv("DATABASE_URL");
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_engine(
+# Asegurarse de que la URL use el prefijo postgresql+asyncpg://
+if DATABASE_URL and DATABASE_URL.startswith('postgresql://'):
+    DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+asyncpg://', 1)
+
+# Crear el motor asíncrono
+engine = create_async_engine(
     DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=20,          # Número base de conexiones en el pool
-    max_overflow=30,       # Conexiones adicionales cuando el pool está lleno
-    pool_pre_ping=True,    # Verifica conexiones antes de usarlas
-    pool_recycle=3600,     # Recicla conexiones después de 1 hora
-    echo=False             # True para debug SQL
+    echo=False,  # True para debug SQL
+    pool_pre_ping=True,
+    pool_size=20,
+    max_overflow=30
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Configurar la sesión asíncrona
+AsyncSessionLocal = sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False
+)
 
 Base = declarative_base()
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
 
 async def init_db():
     """Inicializa la conexión a la base de datos"""
-    print("Conexión a la base de datos establecida - Pool de conexiones creado")
+    print("Conexión a la base de datos establecida - Pool de conexiones asíncrono creado")
