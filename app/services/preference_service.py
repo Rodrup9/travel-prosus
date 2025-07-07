@@ -35,10 +35,16 @@ class PreferenceService:
 
     async def get_preferences(self, sql_ids: Optional[List[str]] = None) -> UserPreferenceResponse:
         query, params = self._build_query(sql_ids)
+        print(f"Query ejecutada: {query}")
+        print(f"Parámetros: {params}")
+        
         results = self.neo4j.run_query(query, params)
+        print(f"Resultados de Neo4j: {results}")
         
         if not results:
+            print("No se encontraron resultados")
             return UserPreferenceResponse(data=[], count=0)
         
         validated_data = [UserPreferenceBase(**item) for item in results]
+        print(f"Datos validados: {validated_data}")
         return UserPreferenceResponse(data=validated_data, count=len(validated_data))
