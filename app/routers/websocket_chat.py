@@ -38,6 +38,10 @@ async def websocket_endpoint(websocket: WebSocket, group_id: str):
                 try:
                     new_message = GroupChatService.create_message(db, chat_create)
                     
+                    # Obtener información del usuario
+                    user = db.query(User).filter(User.id == new_message.user_id).first()
+                    user_name = user.name if user else "Usuario desconocido"
+                    
                     # Crear respuesta para confirmar el mensaje
                     response = {
                         "type": "message_sent",
@@ -46,8 +50,9 @@ async def websocket_endpoint(websocket: WebSocket, group_id: str):
                             "user_id": str(new_message.user_id),
                             "group_id": str(new_message.group_id),
                             "message": new_message.message,
-                            "created_at": new_message.created_at.strftime("%Y-%m-%dT%H:%M:%S"),
-                            "status": new_message.status
+                            "created_at": new_message.created_at.isoformat(),
+                            "status": new_message.status,
+                            "user_name": user_name
                         }
                     }
                     
@@ -55,6 +60,20 @@ async def websocket_endpoint(websocket: WebSocket, group_id: str):
                     await realtime_manager.send_personal_message(
                         json.dumps(response), 
                         websocket
+                    )
+                    
+                    # Broadcast del nuevo mensaje a todos los clientes del grupo
+                    await realtime_manager.broadcast_new_message(
+                        {
+                            "id": str(new_message.id),
+                            "user_id": str(new_message.user_id),
+                            "group_id": str(new_message.group_id),
+                            "message": new_message.message,
+                            "created_at": new_message.created_at.isoformat(),
+                            "status": new_message.status,
+                            "user_name": user_name
+                        },
+                        group_id
                     )
                     
                 except Exception as e:
