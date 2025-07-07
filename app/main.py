@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.routers import users, groups, trips, itineraries, flights, hotels, votes, group_chat, group_members, ia_chat, auth, websocket_chat, agent_preferences
 from app.database import init_db, engine
@@ -15,6 +16,15 @@ async def lifespan(app: FastAPI):
     print("Pool de conexiones cerrado")
 
 app = FastAPI(lifespan=lifespan)
+
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Incluir routers
 app.include_router(users.router, prefix="/users", tags=["Users"])
