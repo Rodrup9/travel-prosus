@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.routers import users, groups, trips, itineraries, flights, hotels, votes, group_chat, group_members, ia_chat, auth, websocket_chat
+from app.routers import users, groups, trips, itineraries, flights, hotels, votes, group_chat, group_members, ia_chat, auth, websocket_chat, agent_preferences
 from app.database import init_db, engine
 # from app.neo4j_client import Neo4jClient
 from app.routers import preferences_neo4j
@@ -40,7 +40,7 @@ app.include_router(ia_chat.router, prefix="/ia_chat", tags=["IA Chat"])
 app.include_router(preferences_neo4j.router)
 app.include_router(auth.router)
 app.include_router(websocket_chat.router, tags=["WebSocket Chat"])
-
+app.include_router(agent_preferences.router)
 
 @app.get("/pool-status")
 async def pool_status():
