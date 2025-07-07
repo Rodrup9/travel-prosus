@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat en Tiempo Real - Travel ProSus</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 90%;
+            max-width: 800px;
+            height: 80vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .connection-status {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            background: rgba(255,255,255,0.2);
+        }
+
+        .connection-status.connected {
+            background: rgba(76, 175, 80, 0.8);
+        }
+
+        .connection-status.disconnected {
+            background: rgba(244, 67, 54, 0.8);
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message.own {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+        }
+
+        .message.own .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.other .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-info {
+            font-size: 11px;
+            margin-top: 5px;
+            opacity: 0.7;
+        }
+
+        .typing-indicator {
+            padding: 10px;
+            font-style: italic;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .chat-input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .message-input:focus {
+            border-color: #667eea;
+        }
+
+        .send-button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .send-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .setup-form {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .setup-form h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+            background: white;
+        }
+
+        .form-group select:focus {
+            border-color: #667eea;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: #667eea;
+        }
+
+        .start-button {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s;
+            margin-top: 10px;
+        }
+
+        .start-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .start-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+
+        .error {
+            color: #e74c3c;
+            background: #fdf2f2;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #f5c6cb;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .refresh-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .refresh-button:hover {
+            background: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <!-- Formulario de configuración -->
+    <div id="setup-form" class="setup-form">
+        <h2>Configurar Chat en Tiempo Real</h2>
+        
+        <div id="loading-message" class="loading">
+            Cargando grupos y usuarios...
+        </div>
+        
+        <div id="error-message" class="error hidden"></div>
+        
+        <div class="form-group">
+            <label for="group-select">Seleccionar Grupo:</label>
+            <select id="group-select" disabled>
+                <option value="">Cargando grupos...</option>
+            </select>
+            <button class="refresh-button" onclick="loadGroups()">🔄</button>
+        </div>
+        
+        <div class="form-group">
+            <label for="user-select">Seleccionar Usuario:</label>
+            <select id="user-select" disabled>
+                <option value="">Cargando usuarios...</option>
+            </select>
+            <button class="refresh-button" onclick="loadUsers()">🔄</button>
+        </div>
+        
+        <div class="form-group">
+            <label for="server-url">URL del Servidor:</label>
+            <input type="text" id="server-url" value="ws://localhost:8000" placeholder="ws://localhost:8000">
+        </div>
+        
+        <button id="start-button" class="start-button" onclick="startChat()" disabled>
+            Iniciar Chat
+        </button>
+    </div>
+
+    <!-- Contenedor del chat -->
+    <div id="chat-container" class="chat-container hidden">
+        <div class="chat-header">
+            <h2>Chat en Tiempo Real</h2>
+            <div id="connection-status" class="connection-status disconnected">
+                Desconectado
+            </div>
+        </div>
+        
+        <div class="chat-messages" id="chat-messages">
+            <div class="message other">
+                <div class="message-content">
+                    <div>¡Bienvenido al chat en tiempo real!</div>
+                    <div class="message-info">Sistema • Ahora</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="typing-indicator" class="typing-indicator hidden">
+            Alguien está escribiendo...
+        </div>
+        
+        <div class="chat-input-container">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="message-input" 
+                    class="message-input" 
+                    placeholder="Escribe tu mensaje..."
+                    onkeypress="handleKeyPress(event)"
+                    oninput="handleTyping()"
+                >
+                <button id="send-button" class="send-button" onclick="sendMessage()">
+                    Enviar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="chat_client.js"></script>
+    <script>
+        let chatClient = null;
+        let groups = [];
+        let users = [];
+        const API_BASE = 'http://localhost:8000';
+
+        // Cargar datos al iniciar
+        window.addEventListener('load', async () => {
+            await Promise.all([
+                loadGroups(),
+                loadUsers()
+            ]);
+        });
+
+        async function loadGroups() {
+            try {
+                const response = await fetch(`${API_BASE}/chat/groups`);
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                groups = await response.json();
+                
+                const groupSelect = document.getElementById('group-select');
+                groupSelect.innerHTML = '<option value="">Selecciona un grupo</option>';
+                
+                groups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.id;
+                    option.textContent = `${group.name} (ID: ${group.id.substring(0, 8)}...)`;
+                    groupSelect.appendChild(option);
+                });
+                
+                groupSelect.disabled = false;
+                updateStartButton();
+                
+            } catch (error) {
+                console.error('Error cargando grupos:', error);
+                showError('Error al cargar grupos: ' + error.message);
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/chat/users`);
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                users = await response.json();
+                
+                const userSelect = document.getElementById('user-select');
+                userSelect.innerHTML = '<option value="">Selecciona un usuario</option>';
+                
+                users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.id;
+                    option.textContent = `${user.name} (${user.email})`;
+                    userSelect.appendChild(option);
+                });
+                
+                userSelect.disabled = false;
+                updateStartButton();
+                
+            } catch (error) {
+                console.error('Error cargando usuarios:', error);
+                showError('Error al cargar usuarios: ' + error.message);
+            }
+        }
+
+        function updateStartButton() {
+            const groupSelect = document.getElementById('group-select');
+            const userSelect = document.getElementById('user-select');
+            const startButton = document.getElementById('start-button');
+            const loadingMessage = document.getElementById('loading-message');
+            
+            if (groupSelect.value && userSelect.value) {
+                startButton.disabled = false;
+                loadingMessage.classList.add('hidden');
+            } else {
+                startButton.disabled = true;
+                if (!groupSelect.disabled && !userSelect.disabled) {
+                    loadingMessage.classList.add('hidden');
+                }
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        function startChat() {
+            const groupId = document.getElementById('group-select').value;
+            const userId = document.getElementById('user-select').value;
+            const serverUrl = document.getElementById('server-url').value;
+
+            if (!groupId || !userId) {
+                showError('Por favor selecciona un grupo y un usuario');
+                return;
+            }
+
+            // Obtener nombres para mostrar
+            const selectedGroup = groups.find(g => g.id === groupId);
+            const selectedUser = users.find(u => u.id === userId);
+
+            console.log('Iniciando chat con:', {
+                groupId,
+                userId,
+                groupName: selectedGroup?.name,
+                userName: selectedUser?.name
+            });
+
+            // Crear cliente de chat
+            chatClient = new RealtimeChatClient(groupId, userId, serverUrl.replace('ws://', 'http://').replace('https://', 'ws://'));
+
+            // Configurar manejadores de eventos
+            setupEventHandlers();
+
+            // Conectar al chat
+            chatClient.connect();
+
+            // Mostrar chat y ocultar formulario
+            document.getElementById('setup-form').classList.add('hidden');
+            document.getElementById('chat-container').classList.remove('hidden');
+            
+            // Actualizar header con información del grupo
+            document.querySelector('.chat-header h2').textContent = `Chat: ${selectedGroup?.name}`;
+        }
+
+        function setupEventHandlers() {
+            // Manejar nuevos mensajes
+            chatClient.onMessage('new_message', (data) => {
+                const userName = users.find(u => u.id === data.user_id)?.name || 'Usuario';
+                addMessage(data, false, userName);
+            });
+
+            // Manejar mensajes enviados
+            chatClient.onMessage('message_sent', (data) => {
+                const userName = users.find(u => u.id === data.user_id)?.name || 'Tú';
+                addMessage(data, true, userName);
+            });
+
+            // Manejar usuarios escribiendo
+            chatClient.onMessage('user_typing', (data) => {
+                const userName = users.find(u => u.id === data.user_id)?.name || 'Usuario';
+                showTypingIndicator(userName);
+            });
+
+            // Manejar usuarios que dejaron de escribir
+            chatClient.onMessage('user_stop_typing', (data) => {
+                hideTypingIndicator();
+            });
+
+            // Manejar errores
+            chatClient.onMessage('error', (data) => {
+                addSystemMessage(`Error: ${data.message}`);
+            });
+
+            // Manejar cambios de conexión
+            chatClient.onConnection('connected', () => {
+                updateConnectionStatus(true);
+                addSystemMessage('Conectado al chat');
+            });
+
+            chatClient.onConnection('disconnected', () => {
+                updateConnectionStatus(false);
+                addSystemMessage('Desconectado del chat');
+            });
+
+            chatClient.onConnection('error', (error) => {
+                updateConnectionStatus(false);
+                addSystemMessage('Error de conexión');
+            });
+        }
+
+        function addMessage(data, isOwn, userName) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
+            
+            const time = new Date(data.created_at).toLocaleTimeString();
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    <div>${escapeHtml(data.message)}</div>
+                    <div class="message-info">${userName} • ${time}</div>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addSystemMessage(message) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message other';
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    <div style="color: #666; font-style: italic;">${escapeHtml(message)}</div>
+                    <div class="message-info">Sistema • ${new Date().toLocaleTimeString()}</div>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showTypingIndicator(userName) {
+            const indicator = document.getElementById('typing-indicator');
+            indicator.textContent = `${userName} está escribiendo...`;
+            indicator.classList.remove('hidden');
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            indicator.classList.add('hidden');
+        }
+
+        function updateConnectionStatus(isConnected) {
+            const statusElement = document.getElementById('connection-status');
+            if (isConnected) {
+                statusElement.textContent = 'Conectado';
+                statusElement.className = 'connection-status connected';
+            } else {
+                statusElement.textContent = 'Desconectado';
+                statusElement.className = 'connection-status disconnected';
+            }
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value.trim();
+            
+            if (message && chatClient) {
+                chatClient.sendMessage(message);
+                messageInput.value = '';
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function handleTyping() {
+            if (chatClient) {
+                chatClient.handleTyping();
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event listeners para los selects
+        document.getElementById('group-select').addEventListener('change', updateStartButton);
+        document.getElementById('user-select').addEventListener('change', updateStartButton);
+
+        // Desconectar al salir
+        window.addEventListener('beforeunload', () => {
+            if (chatClient) {
+                chatClient.disconnect();
+            }
+        });
+    </script>
+</body>
+</html> 
