@@ -156,9 +156,18 @@ async def get_group_members(group_id: str, db: Session = Depends(get_db)):
         else:
             members = []
         
-        # Obtener otros miembros del grupo (si tienes tabla group_members)
-        # Aquí puedes agregar lógica adicional para obtener miembros
-        
+        # Obtener otros miembros del grupo (excluyendo al host)
+        from app.models.group_member import GroupMember
+        group_members = db.query(GroupMember).filter(GroupMember.group_id == group_uuid, GroupMember.user_id != group.host_id).all()
+        for gm in group_members:
+            user = db.query(User).filter(User.id == gm.user_id).first()
+            if user:
+                members.append({
+                    "id": str(user.id),
+                    "name": user.name,
+                    "email": user.email,
+                    "role": "member"
+                })
         return members
         
     except ValueError:
