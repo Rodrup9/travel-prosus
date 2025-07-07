@@ -13,6 +13,8 @@ from .models import TripContext, AgentResponse, ChatMessage, UserPreferences
 from .travel_tools import TravelPriceSearcher
 from .travel_service import TravelService
 from app.services.chat_service import ChatService
+from app.models.trip import Trip
+from app.models.itinerary import Itinerary
 
 class TripPlannerAgent:
     def __init__(self, db: Session):
@@ -59,12 +61,30 @@ class TripPlannerAgent:
                         
             participants_info.append(user_info)
             
-        # Obtener los últimos mensajes del grupo
+        # Obtener los últimos mensajes del grupo con más contexto
         recent_messages = group_context.get("recent_messages", [])
+        
+        # Filtrar mensajes relevantes para el viaje (últimos 20 en lugar de 10)
+        relevant_messages = []
+        for msg in recent_messages[:20]:
+            message_text = msg.get('message', '').lower()
+            # Incluir mensajes que contengan palabras clave relacionadas con viajes
+            travel_keywords = ['viaje', 'destino', 'hotel', 'vuelo', 'actividad', 'plan', 'itinerario', 
+                             'fecha', 'presupuesto', 'lugar', 'visitar', 'explorar', 'turismo']
+            if any(keyword in message_text for keyword in travel_keywords) or len(message_text) > 10:
+                relevant_messages.append(msg)
+        
+        # Si no hay mensajes relevantes, incluir los últimos 5 mensajes
+        if not relevant_messages and recent_messages:
+            relevant_messages = recent_messages[:5]
+        
         chat_summary = "\n".join([
             f"{user_names.get(msg['user_id'], msg['user_id'])}: {msg['message']}"
-            for msg in recent_messages
+            for msg in relevant_messages
         ])
+        
+        # Agregar análisis del contexto de la conversación
+        conversation_analysis = self._analyze_conversation_context(relevant_messages)
         
         prompt = f"""Eres un experto planificador de viajes que ayuda a grupos a crear itinerarios personalizados.
         
@@ -74,9 +94,13 @@ Grupo: {group_context.get('group', {}).get('name', 'Sin nombre')}
 INFORMACIÓN DE PARTICIPANTES:
 {'\n'.join(participants_info)}
 
+ANÁLISIS DE LA CONVERSACIÓN:
+{conversation_analysis}
+
 CONVERSACIÓN RECIENTE DEL GRUPO:
 {chat_summary}
 
+REQUERIMIENTO ESPECÍFICO:
 {context.specific_requirements or 'Por favor, genera un itinerario detallado considerando los intereses y preferencias del grupo, así como la conversación reciente del grupo.'}
 
 HERRAMIENTAS DISPONIBLES:
@@ -112,7 +136,10 @@ Por favor, estructura tu respuesta en formato JSON con los siguientes campos:
     ],
     "total_estimated_cost": "string",
     "recommendations": ["string"],
-    "weather_considerations": "string"
+    "weather_considerations": "string",
+    "destination": "string",
+    "start_date": "YYYY-MM-DD",
+    "end_date": "YYYY-MM-DD"
 }"""
 
         return prompt
@@ -197,16 +224,87 @@ Por favor, estructura tu respuesta en formato JSON con los siguientes campos:
                 results[f"error_{tool_name}"] = self._handle_tool_error(tool_name, e)
                 
         return results
+
+    def _save_itinerary_to_database(self, trip_id: uuid.UUID, itinerary_data: Dict[str, Any]) -> None:
+        """
+        Guarda el itinerario generado en la base de datos
+        """
+        try:
+            # Actualizar información del viaje
+            trip = self.db.query(Trip).filter(Trip.id == trip_id).first()
+            if trip:
+                trip.destination = itinerary_data.get("destination", "")
+                trip.start_date = datetime.strptime(itinerary_data.get("start_date", ""), "%Y-%m-%d").date() if itinerary_data.get("start_date") else None
+                trip.end_date = datetime.strptime(itinerary_data.get("end_date", ""), "%Y-%m-%d").date() if itinerary_data.get("end_date") else None
+                
+            # Guardar actividades del itinerario
+            itinerary_days = itinerary_data.get("itinerary_days", [])
+            for day_data in itinerary_days:
+                day_number = day_data.get("day", 1)
+                activities = day_data.get("activities", [])
+                
+                for activity in activities:
+                    # Calcular la fecha del día
+                    if trip and trip.start_date:
+                        activity_date = trip.start_date + timedelta(days=day_number - 1)
+                    else:
+                        activity_date = datetime.now().date()
+                    
+                    # Parsear tiempo de inicio y fin
+                    time_str = activity.get("time", "")
+                    start_time = None
+                    end_time = None
+                    
+                    if "-" in time_str:
+                        times = time_str.split("-")
+                        if len(times) == 2:
+                            start_time = datetime.strptime(times[0].strip(), "%H:%M").time()
+                            end_time = datetime.strptime(times[1].strip(), "%H:%M").time()
+                    
+                    # Crear entrada del itinerario
+                    itinerary_entry = Itinerary(
+                        trip_id=trip_id,
+                        day=activity_date,
+                        activity=activity.get("activity", ""),
+                        location=activity.get("location", ""),
+                        start_time=start_time,
+                        end_time=end_time,
+                        status=True
+                    )
+                    self.db.add(itinerary_entry)
+            
+            self.db.commit()
+            
+        except Exception as e:
+            self.db.rollback()
+            print(f"Error guardando itinerario en base de datos: {str(e)}")
+            raise
         
     def generate_itinerary(self, context: TripContext, trip_id: uuid.UUID) -> AgentResponse:
         """
         Genera un itinerario basado en el contexto del viaje
         """
         try:
+            # Log de inicio de actividad
+            self._log_agent_activity("generate_itinerary_start", {
+                "trip_id": str(trip_id),
+                "group_id": str(context.group_id),
+                "participants_count": len(context.participants)
+            })
+            
+            # Validar configuración de APIs
+            self._validate_api_configuration()
+            
             # Validar el contexto antes de procesar
             self._validate_trip_context(context)
             
             prompt = self._build_prompt(context)
+            
+            # Log del prompt generado
+            self._log_agent_activity("prompt_generated", {
+                "prompt_length": len(prompt),
+                "has_tools": True
+            })
             
             # Primera llamada para obtener los requisitos de búsqueda
             completion = self.client.chat.completions.create(
@@ -215,8 +313,8 @@ Por favor, estructura tu respuesta en formato JSON con los siguientes campos:
                     {"role": "user", "content": prompt}
                 ],
                 model=settings.MODEL_NAME,
-                temperature=settings.TEMPERATURE,
-                max_tokens=settings.MAX_TOKENS,
+                temperature=settings.SEARCH_TEMPERATURE,  # Usar temperatura de búsqueda
+                max_tokens=settings.SEARCH_MAX_TOKENS,   # Usar tokens de búsqueda
                 tools=[
                     {
                         "type": "function",
@@ -270,8 +368,20 @@ Por favor, estructura tu respuesta en formato JSON con los siguientes campos:
             response = completion.choices[0].message
             
             if hasattr(response, 'tool_calls') and response.tool_calls:
+                # Log de llamadas a herramientas
+                self._log_agent_activity("tool_calls_detected", {
+                    "tool_calls_count": len(response.tool_calls),
+                    "tools": [tc.get("name", "unknown") for tc in response.tool_calls]
+                })
+                
                 # Procesar las llamadas a herramientas y obtener resultados
                 tool_results = self._process_tool_calls(response.tool_calls, trip_id)
+                
+                # Log de resultados de herramientas
+                self._log_agent_activity("tool_results_processed", {
+                    "results_count": len(tool_results),
+                    "has_errors": any("error_" in key for key in tool_results.keys())
+                })
                 
                 # Segunda llamada incluyendo los resultados de las búsquedas
                 final_prompt = f"""Basado en las búsquedas realizadas, aquí están los resultados:
@@ -291,21 +401,87 @@ Incluye recomendaciones específicas basadas en el clima y la información de lo
                         {"role": "user", "content": final_prompt}
                     ],
                     model=settings.MODEL_NAME,
-                    temperature=settings.TEMPERATURE,
-                    max_tokens=settings.MAX_TOKENS
+                    temperature=settings.ITINERARY_TEMPERATURE,  # Usar temperatura específica para itinerarios
+                    max_tokens=settings.ITINERARY_MAX_TOKENS,    # Usar tokens específicos para itinerarios
+                    response_format={"type": "json_object"}  # Forzar respuesta JSON
                 )
                 
+                final_response = final_completion.choices[0].message.content
+                
+                # Intentar parsear la respuesta como JSON para guardar en BD
+                try:
+                    itinerary_data = json.loads(final_response)
+                    self._save_itinerary_to_database(trip_id, itinerary_data)
+                    
+                    # Log de itinerario guardado
+                    self._log_agent_activity("itinerary_saved", {
+                        "trip_id": str(trip_id),
+                        "days_count": len(itinerary_data.get("itinerary_days", [])),
+                        "destination": itinerary_data.get("destination", "")
+                    })
+                    
+                except json.JSONDecodeError as e:
+                    # Log de error de parsing JSON
+                    self._log_agent_activity("json_parse_error", {
+                        "error": str(e),
+                        "response_preview": final_response[:200]
+                    })
+                
                 return AgentResponse(
-                    itinerary=final_completion.choices[0].message.content,
+                    itinerary=final_response,
                     reasoning="Itinerario generado basado en precios reales, clima y preferencias del grupo"
                 )
             
+            # Si no hay llamadas a herramientas, generar itinerario directo
+            self._log_agent_activity("no_tool_calls", {
+                "message": "Generando itinerario sin búsquedas externas"
+            })
+            
+            direct_completion = self.client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "Eres un experto planificador de viajes que ayuda a grupos."},
+                    {"role": "user", "content": prompt}
+                ],
+                model=settings.MODEL_NAME,
+                temperature=settings.ITINERARY_TEMPERATURE,
+                max_tokens=settings.ITINERARY_MAX_TOKENS,
+                response_format={"type": "json_object"}
+            )
+            
+            direct_response = direct_completion.choices[0].message.content
+            
+            # Intentar parsear la respuesta como JSON para guardar en BD
+            try:
+                itinerary_data = json.loads(direct_response)
+                self._save_itinerary_to_database(trip_id, itinerary_data)
+                
+                # Log de itinerario guardado
+                self._log_agent_activity("itinerary_saved", {
+                    "trip_id": str(trip_id),
+                    "days_count": len(itinerary_data.get("itinerary_days", [])),
+                    "destination": itinerary_data.get("destination", "")
+                })
+                
+            except json.JSONDecodeError as e:
+                # Log de error de parsing JSON
+                self._log_agent_activity("json_parse_error", {
+                    "error": str(e),
+                    "response_preview": direct_response[:200]
+                })
+            
             return AgentResponse(
-                itinerary=response.content,
+                itinerary=direct_response,
                 reasoning="Itinerario generado basado en preferencias del grupo"
             )
             
         except Exception as e:
+            # Log de error
+            self._log_agent_activity("error", {
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+                "trip_id": str(trip_id)
+            })
+            
             return AgentResponse(
                 itinerary="",
                 error=f"Error generando el itinerario: {str(e)}"
@@ -347,22 +523,98 @@ Incluye recomendaciones específicas basadas en el clima y la información de lo
         error_response = {
             "error": str(error),
             "tool": tool_name,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "error_type": type(error).__name__,
+            "suggestion": self._get_error_suggestion(tool_name, error)
         }
         return error_response
 
+    def _get_error_suggestion(self, tool_name: str, error: Exception) -> str:
+        """Proporciona sugerencias específicas para diferentes tipos de errores"""
+        error_msg = str(error).lower()
+        
+        if tool_name == "get_prices":
+            if "api" in error_msg or "key" in error_msg:
+                return "Verificar configuración de API de Amadeus"
+            elif "date" in error_msg or "fecha" in error_msg:
+                return "Verificar formato de fechas (YYYY-MM-DD)"
+            elif "location" in error_msg or "ubicación" in error_msg:
+                return "Verificar códigos de aeropuerto/ciudad válidos"
+            else:
+                return "Verificar parámetros de búsqueda"
+        
+        elif tool_name == "search_web":
+            if "network" in error_msg or "connection" in error_msg:
+                return "Verificar conexión a internet"
+            else:
+                return "Verificar consulta de búsqueda"
+        
+        elif tool_name == "get_weather":
+            if "location" in error_msg:
+                return "Verificar nombre de ubicación válido"
+            else:
+                return "Verificar parámetros de clima"
+        
+        return "Revisar configuración y parámetros"
+
     def _validate_trip_context(self, context: TripContext) -> None:
         """Valida que el contexto del viaje tenga toda la información necesaria"""
+        errors = []
+        
         if not context.participants:
-            raise ValueError("El contexto debe tener al menos un participante")
+            errors.append("El contexto debe tener al menos un participante")
+        
+        if not context.group_id:
+            errors.append("El contexto debe tener un group_id válido")
+        
+        for i, participant in enumerate(context.participants):
+            if not participant.user_id:
+                errors.append(f"Participante {i+1}: Falta user_id")
             
-        for participant in context.participants:
-            if not participant.user_id or not participant.name:
-                raise ValueError("Todos los participantes deben tener ID y nombre")
-            if not any([participant.destinations, participant.activities, 
-                       participant.prices, participant.accommodations,
-                       participant.transport, participant.motivations]):
-                raise ValueError(f"El participante {participant.name} no tiene preferencias definidas")
+            if not participant.name:
+                errors.append(f"Participante {i+1}: Falta nombre")
+            
+            # Validar que tenga al menos algunas preferencias
+            has_preferences = any([
+                participant.destinations,
+                participant.activities,
+                participant.prices,
+                participant.accommodations,
+                participant.transport,
+                participant.motivations
+            ])
+            
+            if not has_preferences:
+                errors.append(f"Participante {participant.name}: No tiene preferencias definidas")
+        
+        if errors:
+            raise ValueError(f"Errores de validación: {'; '.join(errors)}")
+
+    def _validate_api_configuration(self) -> None:
+        """Valida que la configuración de APIs esté correcta"""
+        errors = []
+        
+        if not settings.GROQ_API_KEY:
+            errors.append("GROQ_API_KEY no está configurada")
+        
+        if settings.ENABLE_FLIGHT_SEARCH or settings.ENABLE_HOTEL_SEARCH:
+            if not settings.AMADEUS_API_KEY:
+                errors.append("AMADEUS_API_KEY no está configurada para búsquedas de vuelos/hoteles")
+            
+            if not settings.AMADEUS_API_SECRET:
+                errors.append("AMADEUS_API_SECRET no está configurada para búsquedas de vuelos/hoteles")
+        
+        if errors:
+            raise ValueError(f"Errores de configuración: {'; '.join(errors)}")
+
+    def _log_agent_activity(self, action: str, details: Dict[str, Any]) -> None:
+        """Registra la actividad del agente para debugging"""
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "action": action,
+            "details": details
+        }
+        print(f"=== AGENT LOG ===\n{json.dumps(log_entry, indent=2)}\n================")
 
     def save_agent_response(self, group_id: uuid.UUID, response: str) -> None:
         """
@@ -372,4 +624,66 @@ Incluye recomendaciones específicas basadas en el clima y la información de lo
             user_id=settings.AGENT_USER_ID,  # ID especial para el agente
             group_id=group_id,
             message=response
-        ) 
+        )
+
+    def _analyze_conversation_context(self, messages: List[Dict[str, Any]]) -> str:
+        """
+        Analiza el contexto de la conversación para extraer información relevante
+        """
+        if not messages:
+            return "No hay conversación previa registrada."
+        
+        # Extraer información clave de los mensajes
+        destinations_mentioned = []
+        dates_mentioned = []
+        budget_mentioned = []
+        activities_mentioned = []
+        
+        for msg in messages:
+            message_text = msg.get('message', '').lower()
+            
+            # Buscar destinos mencionados
+            destination_keywords = ['quiero ir a', 'me gustaría visitar', 'destino', 'lugar', 'ciudad']
+            if any(keyword in message_text for keyword in destination_keywords):
+                # Extraer el nombre del destino (simplificado)
+                destinations_mentioned.append(message_text)
+            
+            # Buscar fechas mencionadas
+            import re
+            date_patterns = [
+                r'\d{1,2}/\d{1,2}/\d{4}',  # DD/MM/YYYY
+                r'\d{4}-\d{2}-\d{2}',       # YYYY-MM-DD
+                r'\d{1,2}-\d{1,2}-\d{4}',   # DD-MM-YYYY
+            ]
+            for pattern in date_patterns:
+                dates = re.findall(pattern, message_text)
+                dates_mentioned.extend(dates)
+            
+            # Buscar presupuesto mencionado
+            budget_keywords = ['presupuesto', 'costo', 'precio', 'gastar', 'dólares', 'euros', 'pesos']
+            if any(keyword in message_text for keyword in budget_keywords):
+                budget_mentioned.append(message_text)
+            
+            # Buscar actividades mencionadas
+            activity_keywords = ['actividad', 'visitar', 'explorar', 'hacer', 'ver', 'conocer']
+            if any(keyword in message_text for keyword in activity_keywords):
+                activities_mentioned.append(message_text)
+        
+        analysis = "INFORMACIÓN EXTRAÍDA DE LA CONVERSACIÓN:\n"
+        
+        if destinations_mentioned:
+            analysis += f"- Destinos mencionados: {', '.join(destinations_mentioned[:3])}\n"
+        
+        if dates_mentioned:
+            analysis += f"- Fechas mencionadas: {', '.join(list(set(dates_mentioned)))}\n"
+        
+        if budget_mentioned:
+            analysis += f"- Referencias a presupuesto: {', '.join(budget_mentioned[:2])}\n"
+        
+        if activities_mentioned:
+            analysis += f"- Actividades mencionadas: {', '.join(activities_mentioned[:3])}\n"
+        
+        if not any([destinations_mentioned, dates_mentioned, budget_mentioned, activities_mentioned]):
+            analysis += "- No se detectó información específica de viaje en la conversación.\n"
+        
+        return analysis 

@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.services.chat_service import ChatService
 from ai_agent.agent_service import TripPlannerAgent
+from ai_agent.models import TripContext, UserPreferences, ChatMessage
+from app.services.agent_preferences_service import AgentPreferencesService
 from pydantic import BaseModel
 from datetime import datetime
 import groq
@@ -18,8 +20,11 @@ from app.models.ia_chat import IAChat
 from app.models.group import Group
 from app.models.user import User
 from app.models.group_chat import GroupChat
+from app.models.trip import Trip
+from app.models.itinerary import Itinerary
 from dotenv import load_dotenv, dotenv_values
 import os
+import httpx
 
 router = APIRouter(prefix="/ia_chat", tags=["IA Chat"])
 
@@ -61,6 +66,58 @@ async def validate_user_and_group(db: AsyncSession, user_id: uuid.UUID, group_id
     )
     result = await db.execute(stmt)
     return result.first() is not None
+
+async def get_group_preferences_for_agent(group_id: uuid.UUID, db: AsyncSession) -> List[UserPreferences]:
+    """
+    Obtiene las preferencias de los usuarios del grupo para el agente
+    """
+    try:
+        # Obtener preferencias desde Neo4j
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://hstp4bpv-8000.usw3.devtunnels.ms/preferences/group/{group_id}"
+            )
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail="Error obteniendo preferencias del grupo"
+                )
+            
+            preferences_data = response.json()
+            return AgentPreferencesService.transform_preferences_to_agent_format(preferences_data)
+            
+    except Exception as e:
+        print(f"Error obteniendo preferencias: {str(e)}")
+        # Retornar lista vacía si hay error
+        return []
+
+async def create_or_get_trip(group_id: uuid.UUID, db: AsyncSession) -> Trip:
+    """
+    Crea un nuevo viaje o obtiene uno existente para el grupo
+    """
+    # Buscar si ya existe un viaje activo para este grupo
+    stmt = select(Trip).where(
+        Trip.group_id == group_id,
+        Trip.status == True
+    )
+    result = await db.execute(stmt)
+    existing_trip = result.scalar_one_or_none()
+    
+    if existing_trip:
+        return existing_trip
+    
+    # Crear nuevo viaje
+    new_trip = Trip(
+        group_id=group_id,
+        destination="",  # Se actualizará cuando se genere el itinerario
+        start_date=None,  # Se actualizará cuando se genere el itinerario
+        end_date=None,    # Se actualizará cuando se genere el itinerario
+        status=True
+    )
+    db.add(new_trip)
+    await db.flush()
+    await db.refresh(new_trip)
+    return new_trip
 
 @router.get("/test-config")
 async def test_config():
@@ -158,7 +215,7 @@ async def send_message_to_agent(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Envía un mensaje al agente y obtiene su respuesta.
+    Envía un mensaje al agente y obtiene su respuesta usando el TripPlannerAgent especializado.
     """
     try:
         # Validar que el usuario y grupo existan
@@ -169,24 +226,6 @@ async def send_message_to_agent(
                 detail="El usuario no pertenece al grupo o el grupo no existe"
             )
 
-        # Cargar configuración fresca
-        settings = get_settings()
-        
-        # Debug: Imprimir configuración
-        print("=== Configuración de Groq ===")
-        print(f"API Key: {settings['GROQ_API_KEY']}")
-        print(f"Model Name: {settings['MODEL_NAME']}")
-        print(f"Temperature: {settings['TEMPERATURE']}")
-        print(f"Max Tokens: {settings['MAX_TOKENS']}")
-        print(f"Tools Enabled: {settings['TOOLS_ENABLED']}")
-        print(f"JSON Mode: {settings['JSON_MODE']}")
-        print("=== Otras configuraciones ===")
-        print(f"Amadeus API Key: {settings['AMADEUS_API_KEY']}")
-        print(f"Amadeus API Secret: {settings['AMADEUS_API_SECRET']}")
-        print(f"Weather API Key: {settings['WEATHER_API_KEY']}")
-        print(f"Web Search Enabled: {settings['WEB_SEARCH_ENABLED']}")
-        print("========================")
-
         # Guardar el mensaje del usuario
         user_message = IAChat(
             user_id=chat_request.user_id,
@@ -196,7 +235,7 @@ async def send_message_to_agent(
         db.add(user_message)
         await db.flush()
         
-        # Obtener mensajes del chat
+        # Obtener mensajes del chat para el contexto
         stmt = select(IAChat).where(
             IAChat.group_id == chat_request.group_id,
             IAChat.status == True
@@ -204,69 +243,60 @@ async def send_message_to_agent(
         result = await db.execute(stmt)
         chat_history = result.scalars().all()
 
-        # Obtener información del grupo
-        stmt = select(Group).where(Group.id == chat_request.group_id)
-        result = await db.execute(stmt)
-        group = result.scalar_one_or_none()
-        group_context = {
-            "group": {
-                "id": str(group.id) if group else None,
-                "name": group.name if group else "Grupo sin nombre",
-                "host_id": str(group.host_id) if group else None
-            }
-        }
-    
-        # Construir el prompt para el agente
-        prompt = f"""Como asistente de viajes, ayuda a responder este mensaje considerando el contexto del grupo:
-
-Mensaje actual: {chat_request.message}
-
-Contexto del grupo:
-{group_context.get('group', {}).get('name', 'Grupo sin nombre')}
-
-Historial reciente:
-{chr(10).join([f"{msg.user_id}: {msg.message}" for msg in chat_history])}
-
-Por favor, proporciona una respuesta útil y relevante que ayude a planificar el viaje."""
-
-        # Crear cliente Groq y obtener respuesta
-        from groq import Groq
-        client = Groq(api_key=settings['GROQ_API_KEY'])
-        completion = await run_in_threadpool(
-            lambda: client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": "Eres un asistente experto en planificación de viajes, especializado en ayudar a grupos a organizar sus viajes."},
-                    {"role": "user", "content": prompt}
-                ],
-                model=settings['MODEL_NAME'],
-                temperature=settings['TEMPERATURE'],
-                max_tokens=settings['MAX_TOKENS']
-            )
-        )
+        # Crear o obtener el viaje para este grupo
+        trip = await create_or_get_trip(chat_request.group_id, db)
         
-        # Extraer la respuesta
-        agent_response = completion.choices[0].message.content
+        # Obtener preferencias de los usuarios del grupo
+        user_profiles = await get_group_preferences_for_agent(chat_request.group_id, db)
         
-        # Guardar la respuesta del agente usando el ID del usuario que envió el mensaje
-        agent_message = IAChat(
-            user_id=chat_request.user_id,  # Usar el mismo usuario que envió el mensaje
+        # Convertir el historial de chat al formato que espera el agente
+        chat_messages = [
+            ChatMessage(
+                user_id=msg.user_id,
+                message=msg.message,
+                created_at=msg.created_at
+            ) for msg in chat_history
+        ]
+        
+        # Crear el contexto para el agente
+        context = TripContext(
             group_id=chat_request.group_id,
-            message=agent_response
+            participants=user_profiles,
+            chat_history=chat_messages,
+            specific_requirements=chat_request.message  # Usar el mensaje actual como requerimiento específico
         )
-        db.add(agent_message)
-        await db.flush()  # Asegurarnos de que tenemos el ID y created_at
-        await db.commit()  # Commit explícito para guardar todos los cambios
-    
-        return ChatResponse(
-            id=agent_message.id,
-            message=agent_message.message,
-            created_at=agent_message.created_at,
-            user_id=agent_message.user_id,
-            group_id=agent_message.group_id
-        )
+        
+        # Crear una sesión síncrona para el agente
+        sync_db = SyncSessionLocal()
+        
+        try:
+            # Inicializar y usar el agente especializado
+            agent = TripPlannerAgent(db=sync_db)
+            response = agent.generate_itinerary(context=context, trip_id=trip.id)
+            
+            # Guardar la respuesta del agente
+            agent_message = IAChat(
+                user_id=chat_request.user_id,
+                group_id=chat_request.group_id,
+                message=response.itinerary
+            )
+            db.add(agent_message)
+            await db.flush()
+            await db.commit()
+            
+            return ChatResponse(
+                id=agent_message.id,
+                message=agent_message.message,
+                created_at=agent_message.created_at,
+                user_id=agent_message.user_id,
+                group_id=agent_message.group_id
+            )
+            
+        finally:
+            sync_db.close()
             
     except Exception as e:
-        await db.rollback()  # Rollback en caso de error
+        await db.rollback()
         # Debug: Imprimir el error completo
         import traceback
         print("=== Error Detallado ===")
@@ -275,4 +305,106 @@ Por favor, proporciona una respuesta útil y relevante que ayude a planificar el
         raise HTTPException(
             status_code=500,
             detail=f"Error procesando el mensaje: {str(e)}"
+        )
+
+@router.get("/itinerary/{group_id}")
+async def get_group_itinerary(
+    group_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene el itinerario guardado para un grupo
+    """
+    try:
+        # Buscar el viaje activo del grupo
+        stmt = select(Trip).where(
+            Trip.group_id == group_id,
+            Trip.status == True
+        )
+        result = await db.execute(stmt)
+        trip = result.scalar_one_or_none()
+        
+        if not trip:
+            raise HTTPException(
+                status_code=404,
+                detail="No se encontró un viaje activo para este grupo"
+            )
+        
+        # Obtener itinerario del viaje
+        stmt = select(Itinerary).where(
+            Itinerary.trip_id == trip.id,
+            Itinerary.status == True
+        ).order_by(Itinerary.day, Itinerary.start_time)
+        result = await db.execute(stmt)
+        itineraries = result.scalars().all()
+        
+        # Obtener vuelos del viaje
+        from app.models.flight import Flight
+        stmt = select(Flight).where(
+            Flight.trip_id == trip.id,
+            Flight.status == True
+        )
+        result = await db.execute(stmt)
+        flights = result.scalars().all()
+        
+        # Obtener hoteles del viaje
+        from app.models.hotel import Hotel
+        stmt = select(Hotel).where(
+            Hotel.trip_id == trip.id,
+            Hotel.status == True
+        )
+        result = await db.execute(stmt)
+        hotels = result.scalars().all()
+        
+        # Formatear respuesta
+        itinerary_data = {
+            "trip": {
+                "id": str(trip.id),
+                "destination": trip.destination,
+                "start_date": trip.start_date.isoformat() if trip.start_date else None,
+                "end_date": trip.end_date.isoformat() if trip.end_date else None,
+                "created_at": trip.created_at.isoformat()
+            },
+            "itinerary": [
+                {
+                    "id": str(item.id),
+                    "day": item.day.isoformat(),
+                    "activity": item.activity,
+                    "location": item.location,
+                    "start_time": item.start_time.isoformat() if item.start_time else None,
+                    "end_time": item.end_time.isoformat() if item.end_time else None
+                }
+                for item in itineraries
+            ],
+            "flights": [
+                {
+                    "id": str(flight.id),
+                    "airline": flight.airline,
+                    "departure_airport": flight.departure_airport,
+                    "arrival_airport": flight.arrival_airport,
+                    "departure_time": flight.departure_time.isoformat(),
+                    "arrival_time": flight.arrival_time.isoformat(),
+                    "price": float(flight.price) if flight.price else None
+                }
+                for flight in flights
+            ],
+            "hotels": [
+                {
+                    "id": str(hotel.id),
+                    "name": hotel.name,
+                    "location": hotel.location,
+                    "price_per_night": float(hotel.price_per_night) if hotel.price_per_night else None,
+                    "rating": float(hotel.rating) if hotel.rating else None,
+                    "link": hotel.link
+                }
+                for hotel in hotels
+            ]
+        }
+        
+        return itinerary_data
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error obteniendo el itinerario: {str(e)}"
         )
