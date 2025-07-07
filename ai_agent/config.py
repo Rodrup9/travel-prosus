@@ -35,9 +35,6 @@ class GroqSettings(BaseSettings):
     # ID especial para identificar los mensajes del agente en el chat
     AGENT_USER_ID: uuid.UUID = uuid.UUID('00000000-0000-0000-0000-000000000000')
 
-# Debug: Imprimir los valores cargados
-print("=== Debug: Valores cargados del .env ===")
-print(f"GROQ_API_KEY: {env_values.get('GROQ_API_KEY')}")
-print("================================")
+
 
 settings = GroqSettings() 

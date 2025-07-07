@@ -28,10 +28,6 @@ def get_settings():
     # Debug: Mostrar información sobre el archivo .env
     current_dir = os.getcwd()
     env_path = os.path.join(current_dir, ".env")
-    print(f"\n=== Debug: Información del archivo .env ===")
-    print(f"Directorio actual: {current_dir}")
-    print(f"Ruta del .env: {env_path}")
-    print(f"¿Existe el archivo?: {os.path.exists(env_path)}")
     if os.path.exists(env_path):
         with open(env_path, 'r') as f:
             first_line = f.readline().strip()
@@ -171,21 +167,6 @@ async def send_message_to_agent(
 
         # Cargar configuración fresca
         settings = get_settings()
-        
-        # Debug: Imprimir configuración
-        print("=== Configuración de Groq ===")
-        print(f"API Key: {settings['GROQ_API_KEY']}")
-        print(f"Model Name: {settings['MODEL_NAME']}")
-        print(f"Temperature: {settings['TEMPERATURE']}")
-        print(f"Max Tokens: {settings['MAX_TOKENS']}")
-        print(f"Tools Enabled: {settings['TOOLS_ENABLED']}")
-        print(f"JSON Mode: {settings['JSON_MODE']}")
-        print("=== Otras configuraciones ===")
-        print(f"Amadeus API Key: {settings['AMADEUS_API_KEY']}")
-        print(f"Amadeus API Secret: {settings['AMADEUS_API_SECRET']}")
-        print(f"Weather API Key: {settings['WEATHER_API_KEY']}")
-        print(f"Web Search Enabled: {settings['WEB_SEARCH_ENABLED']}")
-        print("========================")
 
         # Guardar el mensaje del usuario
         user_message = IAChat(
@@ -269,9 +250,6 @@ Por favor, proporciona una respuesta útil y relevante que ayude a planificar el
         await db.rollback()  # Rollback en caso de error
         # Debug: Imprimir el error completo
         import traceback
-        print("=== Error Detallado ===")
-        print(traceback.format_exc())
-        print("=====================")
         raise HTTPException(
             status_code=500,
             detail=f"Error procesando el mensaje: {str(e)}"
