@@ -1,7 +1,7 @@
 # database.py
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import create_engine
 import os
 
 # URL de la base de datos
@@ -11,25 +11,19 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith('postgresql://'):
     DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+asyncpg://', 1)
 
-# Crear el motor asíncrono
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,  # True para debug SQL
-    pool_pre_ping=True,
-    pool_size=20,
-    max_overflow=30
-)
-
-# Configurar la sesión asíncrona
+# Motor asíncrono
+engine = create_async_engine(DATABASE_URL)
 AsyncSessionLocal = sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False
+    engine, class_=AsyncSession, expire_on_commit=False
 )
 
+# Motor síncrono para operaciones que requieren sincronización
+sync_engine = create_engine("postgresql://postgres:postgres@localhost:5432/travel_prosus")
+
+# Base para los modelos
 Base = declarative_base()
 
-async def get_db():
+async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
         try:
             yield session
