@@ -32,7 +32,9 @@ async def obtener_preferencias_usuario(
         UserPreferenceResponse: Respuesta con las preferencias del usuario
     """
     try:
-        # Verificar que el usuario existe
+        print(f"🔍 Iniciando búsqueda de preferencias para usuario: {user_id}")
+        
+        # Verificar que el usuario existe con timeout rápido
         user = await UserService.get_user_by_id(db, user_id)
         if not user:
             raise HTTPException(
@@ -40,20 +42,42 @@ async def obtener_preferencias_usuario(
                 detail=f"No se encontró el usuario con ID: {user_id}"
             )
         
-        print(f"Buscando preferencias para usuario: {user.name} con ID: {user.id}")
+        print(f"✅ Usuario encontrado: {user.name} con ID: {user.id}")
         
-        # Consultar preferencias en Neo4j usando el SQL ID del usuario
+        # Consultar preferencias en Neo4j con timeout
         user_ids = [str(user.id)]
-        print(f"User IDs para consulta: {user_ids}")
+        print(f"🔗 Consultando Neo4j para user IDs: {user_ids}")
         
-        preferences_response = await preference_service.get_preferences(user_ids)
+        # Agregar timeout y manejo de errores específico para Neo4j
+        import asyncio
+        try:
+            preferences_response = await asyncio.wait_for(
+                preference_service.get_preferences(user_ids),
+                timeout=10.0  # 10 segundos de timeout
+            )
+            print(f"✅ Respuesta de Neo4j recibida: {preferences_response}")
+            return preferences_response
+            
+        except asyncio.TimeoutError:
+            print("⏰ Timeout en consulta Neo4j")
+            raise HTTPException(
+                status_code=408, 
+                detail="Timeout al consultar preferencias en Neo4j. La consulta tardó más de 10 segundos."
+            )
+        except Exception as neo4j_error:
+            print(f"❌ Error en Neo4j: {str(neo4j_error)}")
+            # Retornar respuesta vacía en caso de error de Neo4j
+            return {
+                "status": "error",
+                "message": f"Error en Neo4j: {str(neo4j_error)}",
+                "data": [],
+                "user_count": 0
+            }
         
-        print(f"Respuesta de preferencias: {preferences_response}")
-        
-        return preferences_response
-        
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        print(f"Error en obtener_preferencias_usuario: {str(e)}")
+        print(f"❌ Error general en obtener_preferencias_usuario: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error al obtener preferencias del usuario: {str(e)}"
@@ -72,8 +96,20 @@ async def obtener_preferencias_usuarios(
         
     Returns:
         UserPreferenceResponse: Respuesta con las preferencias de todos los usuarios del grupo
+        
+    Example:
+        GET /preferences/users?group_id=123e4567-e89b-12d3-a456-426614174000
     """
     try:
+        print(f"🔍 Solicitando preferencias para grupo: {group_id}")
+        
+        # Validar que group_id sea un UUID válido
+        if not group_id:
+            raise HTTPException(
+                status_code=422, 
+                detail="El parámetro group_id es requerido y debe ser un UUID válido"
+            )
+        
         # Obtener todos los usuarios del grupo usando UserService
         users_in_group = await UserService.get_user_by_group_id(db, group_id)
         
@@ -83,15 +119,43 @@ async def obtener_preferencias_usuarios(
                 detail=f"No se encontraron usuarios en el grupo con ID: {group_id}"
             )
         
+        print(f"✅ Usuarios encontrados en el grupo: {len(users_in_group)}")
+        
         # Extraer los IDs de los usuarios para consultar en Neo4j
         user_ids = [str(user.id) for user in users_in_group]
+        print(f"🔗 User IDs para consulta Neo4j: {user_ids}")
         
-        # Consultar preferencias en Neo4j usando los SQL IDs
-        preferences_response = await preference_service.get_preferences(user_ids)
+        # Consultar preferencias en Neo4j con timeout
+        import asyncio
+        try:
+            preferences_response = await asyncio.wait_for(
+                preference_service.get_preferences(user_ids),
+                timeout=15.0  # 15 segundos de timeout para múltiples usuarios
+            )
+            print(f"✅ Respuesta de preferencias de grupo: {preferences_response}")
+            return preferences_response
+            
+        except asyncio.TimeoutError:
+            print("⏰ Timeout en consulta Neo4j para grupo")
+            raise HTTPException(
+                status_code=408, 
+                detail="Timeout al consultar preferencias del grupo en Neo4j. La consulta tardó más de 15 segundos."
+            )
+        except Exception as neo4j_error:
+            print(f"❌ Error en Neo4j para grupo: {str(neo4j_error)}")
+            # Retornar respuesta vacía en caso de error de Neo4j
+            return {
+                "status": "error",
+                "message": f"Error en Neo4j para grupo: {str(neo4j_error)}",
+                "data": [],
+                "user_count": len(users_in_group)
+            }
         
-        return preferences_response
-        
+    except HTTPException as he:
+        # Re-raise HTTP exceptions para mantener el status code correcto
+        raise he
     except Exception as e:
+        print(f"❌ Error general en obtener_preferencias_usuarios: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error al obtener preferencias del grupo: {str(e)}"
@@ -101,13 +165,13 @@ async def obtener_preferencias_usuarios(
 @router.post("/preferences/users")
 async def create_preferences_user(data:PreferencesModel,current_user = Depends(get_verify_session),db: AsyncSession = Depends(get_db)):
     """
-    Create prefereces for a user
+    Create preferences for a user
     Args:
-        user_id: ID of the user
-        preference_type: Type of preference
-        preference_value: Value of the preference
+        data: JSON with user preferences from frontend
+        current_user: Authenticated user session
+        db: Database session
     Returns:
-        array of preferences
+        JSON response with the original data plus operation result
     """
     user = await UserService.get_user_by_id(db,current_user.id)
     if not user:
@@ -141,12 +205,57 @@ async def create_preferences_user(data:PreferencesModel,current_user = Depends(g
     print(query)
 
     try:
-        result = neo4j_client.run_query(query)
-        print(result)
-        return result
+        # Ejecutar la consulta Neo4j
+        neo4j_result = neo4j_client.run_query(query)
+        print(neo4j_result)
+        
+        # Retornar el JSON original del frontend junto con información adicional
+        return {
+            "success": True,
+            "message": "Preferences created successfully",
+            "user_info": {
+                "user_id": str(user.id),
+                "user_name": user.name,
+                "user_email": user.email
+            },
+            "received_data": {
+                "preferences": [
+                    {
+                        "name": pref.name,
+                        "type": pref.type
+                    } for pref in data.preferences
+                ]
+            },
+            "neo4j_operation": {
+                "status": "completed",
+                "result": neo4j_result
+            }
+        }
     except Exception as e:
         print(e)
-        return {"error": str(e)}
+        # En caso de error, también retornar el JSON original
+        return {
+            "success": False,
+            "message": "Error creating preferences",
+            "error": str(e),
+            "user_info": {
+                "user_id": str(user.id),
+                "user_name": user.name,
+                "user_email": user.email
+            },
+            "received_data": {
+                "preferences": [
+                    {
+                        "name": pref.name,
+                        "type": pref.type
+                    } for pref in data.preferences
+                ]
+            },
+            "neo4j_operation": {
+                "status": "failed",
+                "error": str(e)
+            }
+        }
 
 @router.get("/preferences/debug/neo4j/{user_id}")
 async def debug_neo4j_data(user_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
@@ -226,3 +335,98 @@ async def debug_neo4j_data(user_id: uuid.UUID, db: AsyncSession = Depends(get_db
     except Exception as e:
         print(f"Error en debug: {str(e)}")
         return {"error": str(e)}
+
+@router.get("/preferences/test/neo4j")
+async def test_neo4j_connection():
+    """
+    Test rápido de conectividad con Neo4j
+    """
+    try:
+        import asyncio
+        import time
+        
+        start_time = time.time()
+        print("🧪 Iniciando test de conectividad Neo4j...")
+        
+        # Consulta simple y rápida
+        simple_query = "RETURN 'Neo4j Connection OK' AS status, datetime() AS timestamp"
+        
+        result = await asyncio.wait_for(
+            asyncio.to_thread(neo4j_client.run_query, simple_query),
+            timeout=5.0  # 5 segundos de timeout
+        )
+        
+        end_time = time.time()
+        response_time = round((end_time - start_time) * 1000, 2)  # en milisegundos
+        
+        print(f"✅ Neo4j conectado en {response_time}ms")
+        
+        return {
+            "status": "success",
+            "message": "Neo4j connection successful",
+            "response_time_ms": response_time,
+            "result": result,
+            "timestamp": time.time()
+        }
+        
+    except asyncio.TimeoutError:
+        print("❌ Timeout en test Neo4j")
+        return {
+            "status": "timeout",
+            "message": "Neo4j connection timeout after 5 seconds",
+            "response_time_ms": 5000,
+            "timestamp": time.time()
+        }
+    except Exception as e:
+        print(f"❌ Error en test Neo4j: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Neo4j connection failed: {str(e)}",
+            "timestamp": time.time()
+        }
+
+@router.get("/preferences/test/preference-service")
+async def test_preference_service():
+    """
+    Test del servicio de preferencias con datos de prueba
+    """
+    try:
+        import asyncio
+        import time
+        
+        start_time = time.time()
+        print("🧪 Iniciando test del servicio de preferencias...")
+        
+        # Test con un array vacío primero
+        empty_result = await asyncio.wait_for(
+            preference_service.get_preferences([]),
+            timeout=5.0
+        )
+        
+        end_time = time.time()
+        response_time = round((end_time - start_time) * 1000, 2)
+        
+        print(f"✅ Servicio de preferencias respondió en {response_time}ms")
+        
+        return {
+            "status": "success",
+            "message": "Preference service working",
+            "response_time_ms": response_time,
+            "empty_query_result": empty_result,
+            "timestamp": time.time()
+        }
+        
+    except asyncio.TimeoutError:
+        return {
+            "status": "timeout",
+            "message": "Preference service timeout after 5 seconds",
+            "response_time_ms": 5000,
+            "timestamp": time.time()
+        }
+    except Exception as e:
+        print(f"❌ Error en test servicio: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Preference service failed: {str(e)}",
+            "timestamp": time.time()
+        }

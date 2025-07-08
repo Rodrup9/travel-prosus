@@ -13,5 +13,7 @@ class UserPreferenceBase(BaseModel):
     Motivaciones: List[str]
 
 class UserPreferenceResponse(BaseModel):
+    status: str = "success"
+    message: str = "Preferences retrieved successfully"
     data: List[UserPreferenceBase]
-    count: int
+    user_count: int

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 import uuid
 from datetime import datetime, date
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     from app.models.group import Group
@@ -20,8 +20,8 @@ class Trip(Base):
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("groups.id"), nullable=False)
     destination: Mapped[str] = mapped_column(String, nullable=False)
-    start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)  # ✅ Permitir NULL
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)    # ✅ Permitir NULL
     status: Mapped[bool] = mapped_column(Boolean, default=True)
 
     group = relationship("Group", back_populates="trips")

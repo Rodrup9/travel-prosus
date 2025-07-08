@@ -10,8 +10,8 @@ import uuid
 class TripBase(BaseModel):
     group_id: uuid.UUID
     destination: str
-    start_date: date
-    end_date: date
+    start_date: Optional[date] = None  # ✅ Permitir NULL
+    end_date: Optional[date] = None    # ✅ Permitir NULL
     status: Optional[bool] = True
 
 class TripCreate(TripBase):

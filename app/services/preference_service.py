@@ -34,17 +34,44 @@ class PreferenceService:
         return query, params
 
     async def get_preferences(self, sql_ids: Optional[List[str]] = None) -> UserPreferenceResponse:
-        query, params = self._build_query(sql_ids)
-        print(f"Query ejecutada: {query}")
-        print(f"Parámetros: {params}")
-        
-        results = self.neo4j.run_query(query, params)
-        print(f"Resultados de Neo4j: {results}")
-        
-        if not results:
-            print("No se encontraron resultados")
-            return UserPreferenceResponse(data=[], count=0)
-        
-        validated_data = [UserPreferenceBase(**item) for item in results]
-        print(f"Datos validados: {validated_data}")
-        return UserPreferenceResponse(data=validated_data, count=len(validated_data))
+        """
+        Obtener preferencias de usuarios de forma asíncrona
+        """
+        try:
+            import asyncio
+            
+            query, params = self._build_query(sql_ids)
+            print(f"Query ejecutada: {query}")
+            print(f"Parámetros: {params}")
+            
+            # Ejecutar la consulta en un thread separado para no bloquear
+            results = await asyncio.to_thread(self.neo4j.run_query, query, params)
+            print(f"Resultados de Neo4j: {results}")
+            
+            if not results:
+                print("No se encontraron resultados")
+                return UserPreferenceResponse(
+                    status="success",
+                    message="No preferences found",
+                    data=[], 
+                    user_count=0
+                )
+            
+            validated_data = [UserPreferenceBase(**item) for item in results]
+            print(f"Datos validados: {len(validated_data)} registros")
+            
+            return UserPreferenceResponse(
+                status="success",
+                message=f"Found preferences for {len(validated_data)} users",
+                data=validated_data, 
+                user_count=len(validated_data)
+            )
+            
+        except Exception as e:
+            print(f"Error en get_preferences: {str(e)}")
+            return UserPreferenceResponse(
+                status="error",
+                message=f"Error getting preferences: {str(e)}",
+                data=[], 
+                user_count=0
+            )
