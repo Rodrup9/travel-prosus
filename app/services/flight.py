@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from app.models.flight import Flight
-from app.schemas.flight import FlightCreate, FlightUpdate
+from app.schemas.flight import FlightCreate, FlightUpdate, FlightCreateCascade
 from typing import Optional, List
 import uuid
 
@@ -16,6 +16,28 @@ class FlightService:
         db_flight = Flight(
             id=uuid.uuid4(),
             trip_id=flight.trip_id,
+            airline=flight.airline,
+            departure_airport=flight.departure_airport,
+            arrival_airport=flight.arrival_airport,
+            departure_time=flight.departure_time,
+            arrival_time=flight.arrival_time,
+            price=flight.price,
+            status=flight.status
+        )
+        try:
+            db.add(db_flight)
+            await db.commit()
+            await db.refresh(db_flight)
+            return db_flight
+        except IntegrityError as e:
+            await db.rollback()
+            raise ValueError(f"Error al crear el vuelo: {str(e.orig)}")
+        
+    @staticmethod
+    async def create_flight_cascade(db: AsyncSession, flight: FlightCreateCascade, trip_id: uuid.UUID) -> Flight:
+        db_flight = Flight(
+            id=uuid.uuid4(),
+            trip_id=trip_id,
             airline=flight.airline,
             departure_airport=flight.departure_airport,
             arrival_airport=flight.arrival_airport,

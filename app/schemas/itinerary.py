@@ -19,6 +19,14 @@ class ItineraryBase(BaseModel):
 class ItineraryCreate(ItineraryBase):
     pass
 
+class ItineraryCreateCascade(BaseModel):
+    day: date
+    activity: str
+    location: str
+    start_time: time
+    end_time: time
+    status: Optional[bool] = True
+
 
 class ItineraryUpdate(BaseModel):
     day: Optional[date] = None

@@ -18,6 +18,13 @@ class HotelBase(BaseModel):
 
 class HotelCreate(HotelBase):
     pass
+class HotelCreateCascade(BaseModel):
+    name: str
+    location: str
+    price_per_night: float
+    rating: float
+    link: str
+    status: Optional[bool] = True
 
 
 class HotelUpdate(BaseModel):

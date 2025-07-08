@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from app.models.itinerary import Itinerary
-from app.schemas.itinerary import ItineraryCreate, ItineraryUpdate
+from app.schemas.itinerary import ItineraryCreate, ItineraryUpdate, ItineraryCreateCascade
 from typing import List, Optional
 import uuid
 
@@ -16,6 +16,27 @@ class ItineraryService:
         itinerary = Itinerary(
             id=uuid.uuid4(),
             trip_id=data.trip_id,
+            day=data.day,
+            activity=data.activity,
+            location=data.location,
+            start_time=data.start_time,
+            end_time=data.end_time,
+            status=data.status
+        )
+        try:
+            db.add(itinerary)
+            await db.commit()
+            await db.refresh(itinerary)
+            return itinerary
+        except IntegrityError as e:
+            await db.rollback()
+            raise ValueError(f"Error al crear el itinerario: {str(e.orig)}")
+    
+    @staticmethod
+    async def create_itinerary_cascade(db: AsyncSession, data: ItineraryCreateCascade, trip_id: uuid.UUID) -> Itinerary:
+        itinerary = Itinerary(
+            id=uuid.uuid4(),
+            trip_id=trip_id,
             day=data.day,
             activity=data.activity,
             location=data.location,

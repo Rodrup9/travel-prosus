@@ -17,6 +17,14 @@ class FlightBase(BaseModel):
 
 class FlightCreate(FlightBase):
     pass
+class FlightCreateCascade(BaseModel):
+    airline: str
+    departure_airport: str
+    arrival_airport: str
+    departure_time: datetime
+    arrival_time: datetime
+    price: float
+    status: Optional[bool] = True
 
 class FlightUpdate(BaseModel):
     airline: Optional[str] = None

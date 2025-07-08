@@ -1,7 +1,10 @@
 # app/schemas/trip.py
 from pydantic import BaseModel
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, List
+from app.schemas.itinerary import ItineraryCreateCascade
+from app.schemas.flight import FlightCreateCascade
+from app.schemas.hotel import HotelCreateCascade
 import uuid
 
 class TripBase(BaseModel):
@@ -12,7 +15,9 @@ class TripBase(BaseModel):
     status: Optional[bool] = True
 
 class TripCreate(TripBase):
-    pass
+    itineraries: Optional[List[ItineraryCreateCascade]] = None
+    flights: Optional[List[FlightCreateCascade]] = None
+    hotels: Optional[List[HotelCreateCascade]] = None
 
 class TripUpdate(BaseModel):
     destination: Optional[str] = None

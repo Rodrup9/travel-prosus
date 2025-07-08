@@ -5,6 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from app.models.trip import Trip
 from app.schemas.trip import TripCreate, TripUpdate
+from app.services.itinerary import ItineraryService
+from app.services.hotel import HotelService
+from app.services.flight import FlightService
 from typing import List, Optional
 import uuid
 
@@ -24,6 +27,31 @@ class TripService:
             db.add(db_trip)
             await db.commit()
             await db.refresh(db_trip)
+            return db_trip
+        except IntegrityError as e:
+            await db.rollback()
+            raise ValueError(f"Error al crear el viaje: {str(e.orig)}")
+
+    @staticmethod
+    async def create_trip_cascade(db: AsyncSession, trip: TripCreate) -> Trip:
+        db_trip = Trip(
+            id=uuid.uuid4(),
+            group_id=trip.group_id,
+            destination=trip.destination,
+            start_date=trip.start_date,
+            end_date=trip.end_date,
+            status=trip.status
+        )
+        try:
+            db.add(db_trip)
+            await db.commit()
+            await db.refresh(db_trip)
+            for itinerary in trip.itineraries:
+                await ItineraryService.create_itinerary_cascade(db, itinerary, db_trip.id)
+            for hotel in trip.hotels:
+                await HotelService.create_hotel_cascade(db, hotel, db_trip.id)
+            for flight in trip.flights:
+                await FlightService.create_flight_cascade(db, flight, db_trip.id)
             return db_trip
         except IntegrityError as e:
             await db.rollback()

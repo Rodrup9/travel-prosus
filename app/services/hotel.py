@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from app.models.hotel import Hotel
-from app.schemas.hotel import HotelCreate, HotelUpdate
+from app.schemas.hotel import HotelCreate, HotelUpdate, HotelCreateCascade
 from typing import List, Optional
 import uuid
 
@@ -16,6 +16,27 @@ class HotelService:
         db_hotel = Hotel(
             id=uuid.uuid4(),
             trip_id=hotel.trip_id,
+            name=hotel.name,
+            location=hotel.location,
+            price_per_night=hotel.price_per_night,
+            rating=hotel.rating,
+            link=hotel.link,
+            status=hotel.status,
+        )
+        try:
+            db.add(db_hotel)
+            await db.commit()
+            await db.refresh(db_hotel)
+            return db_hotel
+        except IntegrityError:
+            await db.rollback()
+            raise ValueError("Error al crear hotel. Verifica la relación trip_id.")
+        
+    @staticmethod
+    async def create_hotel_cascade(db: AsyncSession, hotel: HotelCreateCascade, trip_id: uuid.UUID) -> Hotel:
+        db_hotel = Hotel(
+            id=uuid.uuid4(),
+            trip_id=trip_id,
             name=hotel.name,
             location=hotel.location,
             price_per_night=hotel.price_per_night,

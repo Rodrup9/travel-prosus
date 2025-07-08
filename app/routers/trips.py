@@ -18,6 +18,13 @@ async def create_trip(trip: TripCreate, db: AsyncSession = Depends(get_db)):
         return await TripService.create_trip(db, trip)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@router.post("/full-creation", response_model=TripResponse)
+async def create_trip_full(trip: TripCreate, db: AsyncSession = Depends(get_db)):
+    try:
+        return await TripService.create_trip_cascade(db, trip)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/", response_model=List[TripResponse])
