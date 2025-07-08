@@ -31,11 +31,6 @@ class Vote(Base):
         ForeignKey("users.id")
     )
     
-    # Corregir: añadir mapped_column y usar tipo Python
     vote: Mapped[bool] = mapped_column(Boolean)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
-
-    # Usar back_populates en lugar de backref
-    trip = relationship("Trip", back_populates="votes")
-    user = relationship("User", back_populates="votes")

@@ -1,6 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.models.flight import Flight
 from app.models.hotel import Hotel
 from app.models.trip import Trip
@@ -8,11 +9,11 @@ from .travel_tools import FlightPrice, HotelPrice, TravelPriceSearcher
 import uuid
 
 class TravelService:
-    def __init__(self, db: Session, api_key: str, api_secret: str):
+    def __init__(self, db: AsyncSession, api_key: str, api_secret: str):
         self.db = db
         self.searcher = TravelPriceSearcher(api_key=api_key, api_secret=api_secret)
         
-    def search_and_save_flights(
+    async def search_and_save_flights(
         self,
         trip_id: uuid.UUID,
         origin: str,
@@ -52,13 +53,13 @@ class TravelService:
             self.db.add(db_flight)
             db_flights.append(db_flight)
             
-        self.db.commit()
+        await self.db.commit()
         for flight in db_flights:
-            self.db.refresh(flight)
+            await self.db.refresh(flight)
             
         return db_flights
         
-    def search_and_save_hotels(
+    async def search_and_save_hotels(
         self,
         trip_id: uuid.UUID,
         city: str,
@@ -95,39 +96,46 @@ class TravelService:
             self.db.add(db_hotel)
             db_hotels.append(db_hotel)
             
-        self.db.commit()
+        await self.db.commit()
         for hotel in db_hotels:
-            self.db.refresh(hotel)
+            await self.db.refresh(hotel)
             
         return db_hotels
         
-    def get_trip_flights(self, trip_id: uuid.UUID) -> List[Flight]:
+    async def get_trip_flights(self, trip_id: uuid.UUID) -> List[Flight]:
         """
         Obtiene los vuelos guardados para un viaje
         """
-        return self.db.query(Flight).filter(
+        stmt = select(Flight).where(
             Flight.trip_id == trip_id,
             Flight.status == True
-        ).all()
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
         
-    def get_trip_hotels(self, trip_id: uuid.UUID) -> List[Hotel]:
+    async def get_trip_hotels(self, trip_id: uuid.UUID) -> List[Hotel]:
         """
         Obtiene los hoteles guardados para un viaje
         """
-        return self.db.query(Hotel).filter(
+        stmt = select(Hotel).where(
             Hotel.trip_id == trip_id,
             Hotel.status == True
-        ).all()
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
         
-    def clear_trip_results(self, trip_id: uuid.UUID) -> None:
+    async def clear_trip_results(self, trip_id: uuid.UUID) -> None:
         """
         Marca como inactivos todos los resultados anteriores de un viaje
         """
-        self.db.query(Flight).filter(Flight.trip_id == trip_id).update({"status": False})
-        self.db.query(Hotel).filter(Hotel.trip_id == trip_id).update({"status": False})
-        self.db.commit()
+        from sqlalchemy import update
+        stmt = update(Flight).where(Flight.trip_id == trip_id).values(status=False)
+        await self.db.execute(stmt)
+        stmt = update(Hotel).where(Hotel.trip_id == trip_id).values(status=False)
+        await self.db.execute(stmt)
+        await self.db.commit()
         
-    def format_saved_results(
+    async def format_saved_results(
         self,
         flights: Optional[List[Flight]] = None,
         hotels: Optional[List[Hotel]] = None

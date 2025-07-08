@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from app.routers import users, groups, trips, itineraries, flights, hotels, votes, group_chat, group_members, ia_chat, auth, websocket_chat, agent_preferences
+from app.routers import users, groups, trips, itineraries, flights, hotels, group_chat, group_members, ia_chat, auth, websocket_chat, agent_preferences
 from app.database import init_db, engine
 # from app.neo4j_client import Neo4jClient
 from app.routers import preferences_neo4j
@@ -33,7 +33,6 @@ app.include_router(trips.router, prefix="/trips", tags=["Trips"])
 app.include_router(itineraries.router, prefix="/itineraries", tags=["Itineraries"])
 app.include_router(flights.router, prefix="/flights", tags=["Flights"])
 app.include_router(hotels.router, prefix="/hotels", tags=["Hotels"])
-app.include_router(votes.router, prefix="/votes", tags=["Votes"])
 app.include_router(group_chat.router, prefix="/group_chat", tags=["Group Chat"])
 app.include_router(group_members.router)
 app.include_router(ia_chat.router, prefix="/ia_chat", tags=["IA Chat"])

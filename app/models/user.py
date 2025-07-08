@@ -27,4 +27,3 @@ class User(Base):
     group_memberships = relationship("GroupMember", back_populates="user")
     group_chats = relationship("GroupChat", back_populates="user")
     ia_chats = relationship("IAChat", back_populates="user")
-    votes = relationship("Vote", back_populates="user")
