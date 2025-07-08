@@ -9,8 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.services.chat_service import ChatService
 from ai_agent.agent_service import TripPlannerAgent
+from ai_agent.models import TripContext, UserPreferences, ChatMessage, AgentResponse
+from app.models.trip import Trip
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, date
 import groq
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.sql import select
@@ -137,6 +139,7 @@ class ChatResponse(BaseModel):
     created_at: datetime
     user_id: uuid.UUID
     group_id: uuid.UUID
+    trip_id: Optional[uuid.UUID] = None
 
 # Crear un sessionmaker para sesiones síncronas
 SyncSessionLocal = sessionmaker(
@@ -151,6 +154,30 @@ def get_sync_db():
         yield db
     finally:
         db.close()
+
+async def get_or_create_trip(db: AsyncSession, group_id: uuid.UUID) -> Trip:
+    """Obtiene el viaje activo del grupo o crea uno nuevo"""
+    stmt = select(Trip).where(
+        Trip.group_id == group_id,
+        Trip.status == True
+    ).order_by(Trip.created_at.desc())
+    result = await db.execute(stmt)
+    trip = result.scalar_one_or_none()
+    
+    if not trip:
+        # Crear un nuevo viaje
+        trip = Trip(
+            id=uuid.uuid4(),
+            group_id=group_id,
+            destination="",  # Se actualizará cuando el agente determine el destino
+            start_date=None,  # Se actualizará cuando el agente determine las fechas
+            end_date=None,
+            status=True
+        )
+        db.add(trip)
+        await db.flush()
+    
+    return trip
 
 @router.post("/send-message", response_model=ChatResponse)
 async def send_message_to_agent(
@@ -169,23 +196,11 @@ async def send_message_to_agent(
                 detail="El usuario no pertenece al grupo o el grupo no existe"
             )
 
-        # Cargar configuración fresca
+        # Cargar configuración
         settings = get_settings()
         
-        # Debug: Imprimir configuración
-        print("=== Configuración de Groq ===")
-        print(f"API Key: {settings['GROQ_API_KEY']}")
-        print(f"Model Name: {settings['MODEL_NAME']}")
-        print(f"Temperature: {settings['TEMPERATURE']}")
-        print(f"Max Tokens: {settings['MAX_TOKENS']}")
-        print(f"Tools Enabled: {settings['TOOLS_ENABLED']}")
-        print(f"JSON Mode: {settings['JSON_MODE']}")
-        print("=== Otras configuraciones ===")
-        print(f"Amadeus API Key: {settings['AMADEUS_API_KEY']}")
-        print(f"Amadeus API Secret: {settings['AMADEUS_API_SECRET']}")
-        print(f"Weather API Key: {settings['WEATHER_API_KEY']}")
-        print(f"Web Search Enabled: {settings['WEB_SEARCH_ENABLED']}")
-        print("========================")
+        # Obtener o crear el viaje para este grupo
+        trip = await get_or_create_trip(db, chat_request.group_id)
 
         # Guardar el mensaje del usuario
         user_message = IAChat(
@@ -195,8 +210,8 @@ async def send_message_to_agent(
         )
         db.add(user_message)
         await db.flush()
-        
-        # Obtener mensajes del chat
+
+        # Obtener historial de chat
         stmt = select(IAChat).where(
             IAChat.group_id == chat_request.group_id,
             IAChat.status == True
@@ -204,69 +219,74 @@ async def send_message_to_agent(
         result = await db.execute(stmt)
         chat_history = result.scalars().all()
 
-        # Obtener información del grupo
-        stmt = select(Group).where(Group.id == chat_request.group_id)
-        result = await db.execute(stmt)
-        group = result.scalar_one_or_none()
-        group_context = {
-            "group": {
-                "id": str(group.id) if group else None,
-                "name": group.name if group else "Grupo sin nombre",
-                "host_id": str(group.host_id) if group else None
-            }
-        }
-    
-        # Construir el prompt para el agente
-        prompt = f"""Como asistente de viajes, ayuda a responder este mensaje considerando el contexto del grupo:
+        # Convertir mensajes a formato ChatMessage
+        chat_messages = [
+            ChatMessage(
+                user_id=msg.user_id,
+                message=msg.message,
+                created_at=msg.created_at
+            ) for msg in chat_history
+        ]
 
-Mensaje actual: {chat_request.message}
-
-Contexto del grupo:
-{group_context.get('group', {}).get('name', 'Grupo sin nombre')}
-
-Historial reciente:
-{chr(10).join([f"{msg.user_id}: {msg.message}" for msg in chat_history])}
-
-Por favor, proporciona una respuesta útil y relevante que ayude a planificar el viaje."""
-
-        # Crear cliente Groq y obtener respuesta
-        from groq import Groq
-        client = Groq(api_key=settings['GROQ_API_KEY'])
-        completion = await run_in_threadpool(
-            lambda: client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": "Eres un asistente experto en planificación de viajes, especializado en ayudar a grupos a organizar sus viajes."},
-                    {"role": "user", "content": prompt}
-                ],
-                model=settings['MODEL_NAME'],
-                temperature=settings['TEMPERATURE'],
-                max_tokens=settings['MAX_TOKENS']
-            )
+        # Crear contexto del viaje
+        trip_context = TripContext(
+            group_id=chat_request.group_id,
+            participants=[
+                UserPreferences(
+                    user_id=chat_request.user_id,
+                    name="Usuario",  # Podríamos obtener el nombre real de la base de datos
+                    destinations=[],
+                    activities=[],
+                    prices=[],
+                    accommodations=[],
+                    transport=[],
+                    motivations=[]
+                )
+            ],
+            chat_history=chat_messages,
+            specific_requirements=chat_request.message
         )
-        
-        # Extraer la respuesta
-        agent_response = completion.choices[0].message.content
-        
-        # Guardar la respuesta del agente usando el ID del usuario que envió el mensaje
+
+        # Inicializar el agente de viajes con una sesión síncrona
+        sync_session = SyncSessionLocal()
+        try:
+            agent = TripPlannerAgent(sync_session)
+            
+            # Obtener la respuesta del agente
+            response: AgentResponse = await run_in_threadpool(
+                lambda: agent.generate_itinerary(trip_context, trip.id)
+            )
+            
+            if response.error:
+                raise Exception(response.error)
+                
+            agent_response = response.itinerary
+        finally:
+            sync_session.close()
+
+        # Guardar la respuesta del agente
         agent_message = IAChat(
-            user_id=chat_request.user_id,  # Usar el mismo usuario que envió el mensaje
+            user_id=chat_request.user_id,
             group_id=chat_request.group_id,
             message=agent_response
         )
         db.add(agent_message)
-        await db.flush()  # Asegurarnos de que tenemos el ID y created_at
-        await db.commit()  # Commit explícito para guardar todos los cambios
-    
+        await db.flush()
+        
+        # Commit todos los cambios
+        await db.commit()
+
         return ChatResponse(
             id=agent_message.id,
             message=agent_message.message,
             created_at=agent_message.created_at,
             user_id=agent_message.user_id,
-            group_id=agent_message.group_id
+            group_id=agent_message.group_id,
+            trip_id=trip.id
         )
             
     except Exception as e:
-        await db.rollback()  # Rollback en caso de error
+        await db.rollback()
         # Debug: Imprimir el error completo
         import traceback
         print("=== Error Detallado ===")
