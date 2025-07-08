@@ -1,6 +1,7 @@
 # app/services/itinerary_service.py
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from app.models.itinerary import Itinerary
 from app.schemas.itinerary import ItineraryCreate, ItineraryUpdate
@@ -11,7 +12,7 @@ import uuid
 class ItineraryService:
 
     @staticmethod
-    def create_itinerary(db: Session, data: ItineraryCreate) -> Itinerary:
+    async def create_itinerary(db: AsyncSession, data: ItineraryCreate) -> Itinerary:
         itinerary = Itinerary(
             id=uuid.uuid4(),
             trip_id=data.trip_id,
@@ -24,28 +25,32 @@ class ItineraryService:
         )
         try:
             db.add(itinerary)
-            db.commit()
-            db.refresh(itinerary)
+            await db.commit()
+            await db.refresh(itinerary)
             return itinerary
         except IntegrityError as e:
-            db.rollback()
+            await db.rollback()
             raise ValueError(f"Error al crear el itinerario: {str(e.orig)}")
 
     @staticmethod
-    def get_all(db: Session) -> List[Itinerary]:
-        return db.query(Itinerary).all()
+    async def get_itineraries(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[Itinerary]:
+        result = await db.execute(select(Itinerary).offset(skip).limit(limit))
+        return result.scalars().all()
 
     @staticmethod
-    def get_by_id(db: Session, itinerary_id: uuid.UUID) -> Optional[Itinerary]:
-        return db.query(Itinerary).filter(Itinerary.id == itinerary_id).first()
+    async def get_itinerary_by_id(db: AsyncSession, itinerary_id: uuid.UUID) -> Optional[Itinerary]:
+        result = await db.execute(select(Itinerary).filter(Itinerary.id == itinerary_id))
+        return result.scalar_one_or_none()
 
     @staticmethod
-    def get_by_trip_id(db: Session, trip_id: uuid.UUID) -> List[Itinerary]:
-        return db.query(Itinerary).filter(Itinerary.trip_id == trip_id).all()
+    async def get_itineraries_by_trip(db: AsyncSession, trip_id: uuid.UUID) -> List[Itinerary]:
+        result = await db.execute(select(Itinerary).filter(Itinerary.trip_id == trip_id))
+        return result.scalars().all()
 
     @staticmethod
-    def update_itinerary(db: Session, itinerary_id: uuid.UUID, update: ItineraryUpdate) -> Optional[Itinerary]:
-        itinerary = db.query(Itinerary).filter(Itinerary.id == itinerary_id).first()
+    async def update_itinerary(db: AsyncSession, itinerary_id: uuid.UUID, update: ItineraryUpdate) -> Optional[Itinerary]:
+        result = await db.execute(select(Itinerary).filter(Itinerary.id == itinerary_id))
+        itinerary = result.scalar_one_or_none()
         if not itinerary:
             return None
 
@@ -54,28 +59,30 @@ class ItineraryService:
             setattr(itinerary, key, value)
 
         try:
-            db.commit()
-            db.refresh(itinerary)
+            await db.commit()
+            await db.refresh(itinerary)
             return itinerary
         except IntegrityError as e:
-            db.rollback()
+            await db.rollback()
             raise ValueError(f"Error al actualizar el itinerario: {str(e.orig)}")
 
     @staticmethod
-    def delete_itinerary(db: Session, itinerary_id: uuid.UUID) -> bool:
-        itinerary = db.query(Itinerary).filter(Itinerary.id == itinerary_id).first()
+    async def delete_itinerary(db: AsyncSession, itinerary_id: uuid.UUID) -> bool:
+        result = await db.execute(select(Itinerary).filter(Itinerary.id == itinerary_id))
+        itinerary = result.scalar_one_or_none()
         if not itinerary:
             return False
-        db.delete(itinerary)
-        db.commit()
+        await db.delete(itinerary)
+        await db.commit()
         return True
 
     @staticmethod
-    def toggle_status(db: Session, itinerary_id: uuid.UUID) -> Optional[Itinerary]:
-        itinerary = db.query(Itinerary).filter(Itinerary.id == itinerary_id).first()
+    async def toggle_status(db: AsyncSession, itinerary_id: uuid.UUID) -> Optional[Itinerary]:
+        result = await db.execute(select(Itinerary).filter(Itinerary.id == itinerary_id))
+        itinerary = result.scalar_one_or_none()
         if not itinerary:
             return None
         itinerary.status = not itinerary.status
-        db.commit()
-        db.refresh(itinerary)
+        await db.commit()
+        await db.refresh(itinerary)
         return itinerary

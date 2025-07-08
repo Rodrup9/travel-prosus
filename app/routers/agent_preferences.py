@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session, sessionmaker
 from typing import List, Optional
 import uuid
-from app.database import get_db, engine
+from app.database import get_db, get_sync_db
 from app.services.agent_preferences_service import AgentPreferencesService
 from app.routers.preferences_neo4j import preference_service
 from ai_agent.models import UserPreferences, TripContext, AgentResponse, ChatMessage
@@ -14,13 +13,6 @@ import httpx
 router = APIRouter(
     prefix="/agent",
     tags=["Agent"]
-)
-
-# Crear un sessionmaker para sesiones síncronas
-SyncSessionLocal = sessionmaker(
-    bind=engine.sync_engine,
-    class_=Session,
-    expire_on_commit=False
 )
 
 @router.get("/group-preferences/{group_id}", response_model=List[UserPreferences])
@@ -115,7 +107,7 @@ async def generate_group_itinerary(
         )
         
         # Crear una sesión síncrona
-        sync_db = SyncSessionLocal()
+        sync_db = next(get_sync_db())
         
         try:
             # Inicializar y usar el agente

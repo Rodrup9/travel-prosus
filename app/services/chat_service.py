@@ -1,3 +1,4 @@
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -7,10 +8,10 @@ from app.models.user import User
 from app.models.group import Group
 
 class ChatService:
-    def __init__(self, db: Session):
+    async def __init__(self, db: AsyncSession):
         self.db = db
 
-    def save_message(self, user_id: uuid.UUID, group_id: uuid.UUID, message: str) -> IAChat:
+    async def save_message(self, user_id: uuid.UUID, group_id: uuid.UUID, message: str) -> IAChat:
         """
         Guarda un mensaje en el historial de chat
         """
@@ -20,11 +21,11 @@ class ChatService:
             message=message
         )
         self.db.add(chat_message)
-        self.db.commit()
-        self.db.refresh(chat_message)
+        await self.db.commit()
+        await self.db.refresh(chat_message)
         return chat_message
 
-    def get_chat_history(
+    async def get_chat_history(
         self, 
         group_id: uuid.UUID, 
         limit: int = 50,

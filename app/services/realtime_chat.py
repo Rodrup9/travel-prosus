@@ -5,9 +5,10 @@ from typing import Dict, Set, Optional
 from fastapi import WebSocket, WebSocketDisconnect
 from app.services.group_chat import GroupChatService
 from app.schemas.group_chat import GroupChatCreate
-from sqlalchemy.orm import Session
-from app.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_db, get_sync_db
 from app.models.user import User
+from sqlalchemy import select
 
 class RealtimeChatManager:
     def __init__(self):
@@ -48,38 +49,44 @@ class RealtimeChatManager:
     async def _send_previous_messages(self, websocket: WebSocket, group_id: str):
         """Enviar mensajes anteriores al conectar"""
         try:
-            db = next(get_db())
-            messages = GroupChatService.get_messages_by_group(db, uuid.UUID(group_id))
-            
-            # Obtener información de usuarios para los mensajes
-            user_ids = [msg.user_id for msg in messages]
-            users = db.query(User).filter(User.id.in_(user_ids)).all()
-            user_dict = {user.id: user.name for user in users}
-            
-            # Enviar mensaje de historial
-            history_message = {
-                "type": "message_history",
-                "data": [
-                    {
-                        "id": str(msg.id),
-                        "user_id": str(msg.user_id),
-                        "group_id": str(msg.group_id),
-                        "message": msg.message,
-                        "created_at": msg.created_at.isoformat(),
-                        "status": msg.status,
-                        "user_name": user_dict.get(msg.user_id, "Usuario desconocido")
-                    }
-                    for msg in messages
-                ]
-            }
-            
-            await websocket.send_text(json.dumps(history_message))
-            print(f"Enviados {len(messages)} mensajes anteriores al grupo {group_id}")
-            
+            # Usar sesión asíncrona
+            async for db in get_db():
+                messages = await GroupChatService.get_group_chats_by_group(db, uuid.UUID(group_id))
+                
+                # Obtener información de usuarios para los mensajes
+                user_ids = [msg.user_id for msg in messages]
+                if user_ids:
+                    # Consulta asíncrona para obtener usuarios
+                    stmt = select(User).where(User.id.in_(user_ids))
+                    result = await db.execute(stmt)
+                    users = result.scalars().all()
+                    user_dict = {user.id: user.name for user in users}
+                else:
+                    user_dict = {}
+                
+                # Enviar mensaje de historial
+                history_message = {
+                    "type": "message_history",
+                    "data": [
+                        {
+                            "id": str(msg.id),
+                            "user_id": str(msg.user_id),
+                            "group_id": str(msg.group_id),
+                            "message": msg.message,
+                            "created_at": str(msg.created_at),
+                            "status": msg.status,
+                            "user_name": user_dict.get(msg.user_id, "Usuario desconocido")
+                        }
+                        for msg in messages
+                    ]
+                }
+                
+                await websocket.send_text(json.dumps(history_message))
+                print(f"Enviados {len(messages)} mensajes anteriores al grupo {group_id}")
+                break  # Salir del generador asíncrono
+                
         except Exception as e:
             print(f"Error enviando mensajes anteriores: {e}")
-        finally:
-            db.close()
     
     async def broadcast_new_message(self, message_data: dict, group_id: str):
         """Broadcast de un nuevo mensaje a todos los clientes del grupo"""

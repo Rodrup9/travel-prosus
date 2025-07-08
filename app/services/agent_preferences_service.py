@@ -5,7 +5,7 @@ import uuid
 
 class AgentPreferencesService:
     @staticmethod
-    def transform_preferences_to_agent_format(preferences: UserPreferenceResponse) -> List[UserPreferences]:
+    async def transform_preferences_to_agent_format(preferences: UserPreferenceResponse) -> List[UserPreferences]:
         """
         Transforma las preferencias de Neo4j al formato que necesita el agente
         """

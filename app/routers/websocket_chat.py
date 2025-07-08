@@ -3,7 +3,8 @@ from app.services.realtime_chat import realtime_manager
 from app.services.group_chat import GroupChatService
 from app.schemas.group_chat import GroupChatCreate
 from app.database import get_db
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.models.group import Group
 from app.models.user import User
 import json
@@ -34,60 +35,60 @@ async def websocket_endpoint(websocket: WebSocket, group_id: str):
                 )
                 
                 # Guardar en la base de datos usando el servicio existente
-                db = next(get_db())
-                try:
-                    new_message = GroupChatService.create_message(db, chat_create)
-                    
-                    # Obtener información del usuario
-                    user = db.query(User).filter(User.id == new_message.user_id).first()
-                    user_name = user.name if user else "Usuario desconocido"
-                    
-                    # Crear respuesta para confirmar el mensaje
-                    response = {
-                        "type": "message_sent",
-                        "data": {
-                            "id": str(new_message.id),
-                            "user_id": str(new_message.user_id),
-                            "group_id": str(new_message.group_id),
-                            "message": new_message.message,
-                            "created_at": new_message.created_at.isoformat(),
-                            "status": new_message.status,
-                            "user_name": user_name
+                async for db in get_db():
+                    try:
+                        new_message = await GroupChatService.create_group_chat(db, chat_create)
+                        
+                        # Obtener información del usuario
+                        result = await db.execute(select(User).filter(User.id == new_message.user_id))
+                        user = result.scalar_one_or_none()
+                        user_name = user.name if user else "Usuario desconocido"
+                        
+                        # Crear respuesta para confirmar el mensaje
+                        response = {
+                            "type": "message_sent",
+                            "data": {
+                                "id": str(new_message.id),
+                                "user_id": str(new_message.user_id),
+                                "group_id": str(new_message.group_id),
+                                "message": new_message.message,
+                                "created_at": str(new_message.created_at),
+                                "status": new_message.status,
+                                "user_name": user_name
+                            }
                         }
-                    }
-                    
-                    # Enviar confirmación al remitente
-                    await realtime_manager.send_personal_message(
-                        json.dumps(response), 
-                        websocket
-                    )
-                    
-                    # Broadcast del nuevo mensaje a todos los clientes del grupo
-                    await realtime_manager.broadcast_new_message(
-                        {
-                            "id": str(new_message.id),
-                            "user_id": str(new_message.user_id),
-                            "group_id": str(new_message.group_id),
-                            "message": new_message.message,
-                            "created_at": new_message.created_at.isoformat(),
-                            "status": new_message.status,
-                            "user_name": user_name
-                        },
-                        group_id
-                    )
-                    
-                except Exception as e:
-                    # Enviar error al cliente
-                    error_response = {
-                        "type": "error",
-                        "message": str(e)
-                    }
-                    await realtime_manager.send_personal_message(
-                        json.dumps(error_response), 
-                        websocket
-                    )
-                finally:
-                    db.close()
+                        
+                        # Enviar confirmación al remitente
+                        await realtime_manager.send_personal_message(
+                            json.dumps(response), 
+                            websocket
+                        )
+                        
+                        # Broadcast del nuevo mensaje a todos los clientes del grupo
+                        await realtime_manager.broadcast_new_message(
+                            {
+                                "id": str(new_message.id),
+                                "user_id": str(new_message.user_id),
+                                "group_id": str(new_message.group_id),
+                                "message": new_message.message,
+                                "created_at": str(new_message.created_at),
+                                "status": new_message.status,
+                                "user_name": user_name
+                            },
+                            group_id
+                        )
+                        
+                    except Exception as e:
+                        # Enviar error al cliente
+                        error_response = {
+                            "type": "error",
+                            "message": str(e)
+                        }
+                        await realtime_manager.send_personal_message(
+                            json.dumps(error_response), 
+                            websocket
+                        )
+                    break
             
             elif message_data.get("type") == "typing":
                 # Broadcast de indicador de escritura
@@ -135,17 +136,19 @@ async def get_active_connections(group_id: str):
     }
 
 @router.get("/chat/groups/{group_id}/members", response_model=List[dict])
-async def get_group_members(group_id: str, db: Session = Depends(get_db)):
+async def get_group_members(group_id: str, db: AsyncSession = Depends(get_db)):
     """Obtener miembros de un grupo específico"""
     try:
         group_uuid = uuid.UUID(group_id)
-        group = db.query(Group).filter(Group.id == group_uuid).first()
+        result = await db.execute(select(Group).filter(Group.id == group_uuid))
+        group = result.scalar_one_or_none()
         
         if not group:
             raise HTTPException(status_code=404, detail="Grupo no encontrado")
         
         # Obtener el host del grupo
-        host = db.query(User).filter(User.id == group.host_id).first()
+        host_result = await db.execute(select(User).filter(User.id == group.host_id))
+        host = host_result.scalar_one_or_none()
         if host:
             members = [{
                 "id": str(host.id),
@@ -158,9 +161,12 @@ async def get_group_members(group_id: str, db: Session = Depends(get_db)):
         
         # Obtener otros miembros del grupo (excluyendo al host)
         from app.models.group_member import GroupMember
-        group_members = db.query(GroupMember).filter(GroupMember.group_id == group_uuid, GroupMember.user_id != group.host_id).all()
+        members_result = await db.execute(select(GroupMember).filter(GroupMember.group_id == group_uuid, GroupMember.user_id != group.host_id))
+        group_members = members_result.scalars().all()
+        
         for gm in group_members:
-            user = db.query(User).filter(User.id == gm.user_id).first()
+            user_result = await db.execute(select(User).filter(User.id == gm.user_id))
+            user = user_result.scalar_one_or_none()
             if user:
                 members.append({
                     "id": str(user.id),

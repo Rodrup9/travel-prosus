@@ -1,6 +1,7 @@
 # app/services/flight_service.py
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from app.models.flight import Flight
 from app.schemas.flight import FlightCreate, FlightUpdate
@@ -11,7 +12,7 @@ import uuid
 class FlightService:
 
     @staticmethod
-    def create_flight(db: Session, flight: FlightCreate) -> Flight:
+    async def create_flight(db: AsyncSession, flight: FlightCreate) -> Flight:
         db_flight = Flight(
             id=uuid.uuid4(),
             trip_id=flight.trip_id,
@@ -25,28 +26,32 @@ class FlightService:
         )
         try:
             db.add(db_flight)
-            db.commit()
-            db.refresh(db_flight)
+            await db.commit()
+            await db.refresh(db_flight)
             return db_flight
         except IntegrityError as e:
-            db.rollback()
+            await db.rollback()
             raise ValueError(f"Error al crear el vuelo: {str(e.orig)}")
 
     @staticmethod
-    def get_flight_by_id(db: Session, flight_id: uuid.UUID) -> Optional[Flight]:
-        return db.query(Flight).filter(Flight.id == flight_id).first()
+    async def get_flight_by_id(db: AsyncSession, flight_id: uuid.UUID) -> Optional[Flight]:
+        result = await db.execute(select(Flight).filter(Flight.id == flight_id))
+        return result.scalar_one_or_none()
 
     @staticmethod
-    def get_flights(db: Session, skip: int = 0, limit: int = 100) -> List[Flight]:
-        return db.query(Flight).offset(skip).limit(limit).all()
+    async def get_flights(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[Flight]:
+        result = await db.execute(select(Flight).offset(skip).limit(limit))
+        return result.scalars().all()
 
     @staticmethod
-    def get_flights_by_trip(db: Session, trip_id: uuid.UUID) -> List[Flight]:
-        return db.query(Flight).filter(Flight.trip_id == trip_id).all()
+    async def get_flights_by_trip(db: AsyncSession, trip_id: uuid.UUID) -> List[Flight]:
+        result = await db.execute(select(Flight).filter(Flight.trip_id == trip_id))
+        return result.scalars().all()
 
     @staticmethod
-    def update_flight(db: Session, flight_id: uuid.UUID, update_data: FlightUpdate) -> Optional[Flight]:
-        db_flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    async def update_flight(db: AsyncSession, flight_id: uuid.UUID, update_data: FlightUpdate) -> Optional[Flight]:
+        result = await db.execute(select(Flight).filter(Flight.id == flight_id))
+        db_flight = result.scalar_one_or_none()
         if not db_flight:
             return None
 
@@ -54,30 +59,32 @@ class FlightService:
             setattr(db_flight, field, value)
 
         try:
-            db.commit()
-            db.refresh(db_flight)
+            await db.commit()
+            await db.refresh(db_flight)
             return db_flight
         except IntegrityError as e:
-            db.rollback()
+            await db.rollback()
             raise ValueError(f"Error al actualizar el vuelo: {str(e.orig)}")
 
     @staticmethod
-    def delete_flight(db: Session, flight_id: uuid.UUID) -> bool:
-        db_flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    async def delete_flight(db: AsyncSession, flight_id: uuid.UUID) -> bool:
+        result = await db.execute(select(Flight).filter(Flight.id == flight_id))
+        db_flight = result.scalar_one_or_none()
         if not db_flight:
             return False
 
-        db.delete(db_flight)
-        db.commit()
+        await db.delete(db_flight)
+        await db.commit()
         return True
 
     @staticmethod
-    def toggle_status(db: Session, flight_id: uuid.UUID) -> Optional[Flight]:
-        db_flight = db.query(Flight).filter(Flight.id == flight_id).first()
+    async def toggle_status(db: AsyncSession, flight_id: uuid.UUID) -> Optional[Flight]:
+        result = await db.execute(select(Flight).filter(Flight.id == flight_id))
+        db_flight = result.scalar_one_or_none()
         if not db_flight:
             return None
 
         db_flight.status = not db_flight.status
-        db.commit()
-        db.refresh(db_flight)
+        await db.commit()
+        await db.refresh(db_flight)
         return db_flight

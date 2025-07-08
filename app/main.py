@@ -12,7 +12,7 @@ from app.routers import preferences_neo4j
 async def lifespan(app: FastAPI):
     await init_db()
     yield
-    engine.dispose()
+    await engine.dispose()
     print("Pool de conexiones cerrado")
 
 app = FastAPI(lifespan=lifespan)
@@ -45,9 +45,6 @@ app.include_router(agent_preferences.router)
 @app.get("/pool-status")
 async def pool_status():
     return {
-        "pool_size": engine.pool.size(),
-        "checked_in": engine.pool.checkedin(),
-        "checked_out": engine.pool.checkedout(),
-        "overflow": engine.pool.overflow(),
-        # "invalid": engine.pool.invalid()
+        "status": "Pool de conexiones activo",
+        "engine_type": str(type(engine))
     }

@@ -1,4 +1,5 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from app.models.group_chat import GroupChat
 from app.schemas.group_chat import GroupChatCreate, GroupChatUpdate
@@ -8,7 +9,7 @@ import uuid
 class GroupChatService:
 
     @staticmethod
-    def create_message(db: Session, chat: GroupChatCreate) -> GroupChat:
+    async def create_group_chat(db: AsyncSession, chat: GroupChatCreate) -> GroupChat:
         db_chat = GroupChat(
             id=uuid.uuid4(),
             user_id=chat.user_id,
@@ -18,35 +19,40 @@ class GroupChatService:
         )
         try:
             db.add(db_chat)
-            db.commit()
-            db.refresh(db_chat)
+            await db.commit()
+            await db.refresh(db_chat)
             return db_chat
         except IntegrityError as e:
-            db.rollback()
+            await db.rollback()
             raise ValueError(f"Error al crear el mensaje: {str(e.orig)}")
 
     @staticmethod
-    def get_message_by_id(db: Session, message_id: uuid.UUID) -> Optional[GroupChat]:
-        return db.query(GroupChat).filter(GroupChat.id == message_id).first()
+    async def get_group_chat_by_id(db: AsyncSession, message_id: uuid.UUID) -> Optional[GroupChat]:
+        result = await db.execute(select(GroupChat).filter(GroupChat.id == message_id))
+        return result.scalar_one_or_none()
 
     @staticmethod
-    def get_all_messages(db: Session, skip: int = 0, limit: int = 100) -> List[GroupChat]:
-        return db.query(GroupChat).offset(skip).limit(limit).all()
+    async def get_group_chats(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[GroupChat]:
+        result = await db.execute(select(GroupChat).offset(skip).limit(limit))
+        return result.scalars().all()
 
     @staticmethod
-    def get_messages_by_group(db: Session, group_id: uuid.UUID) -> List[GroupChat]:
-        return db.query(GroupChat).filter(GroupChat.group_id == group_id).order_by(GroupChat.created_at).all()
+    async def get_group_chats_by_group(db: AsyncSession, group_id: uuid.UUID) -> List[GroupChat]:
+        result = await db.execute(select(GroupChat).filter(GroupChat.group_id == group_id).order_by(GroupChat.created_at))
+        return result.scalars().all()
 
     @staticmethod
-    def get_user_messages_in_group(db: Session, group_id: uuid.UUID, user_id: uuid.UUID) -> List[GroupChat]:
-        return db.query(GroupChat).filter(
+    async def get_user_messages_in_group(db: AsyncSession, group_id: uuid.UUID, user_id: uuid.UUID) -> List[GroupChat]:
+        result = await db.execute(select(GroupChat).filter(
             GroupChat.group_id == group_id,
             GroupChat.user_id == user_id
-        ).order_by(GroupChat.created_at).all()
+        ).order_by(GroupChat.created_at))
+        return result.scalars().all()
 
     @staticmethod
-    def update_message(db: Session, message_id: uuid.UUID, chat_update: GroupChatUpdate) -> Optional[GroupChat]:
-        db_chat = db.query(GroupChat).filter(GroupChat.id == message_id).first()
+    async def update_group_chat(db: AsyncSession, message_id: uuid.UUID, chat_update: GroupChatUpdate) -> Optional[GroupChat]:
+        result = await db.execute(select(GroupChat).filter(GroupChat.id == message_id))
+        db_chat = result.scalar_one_or_none()
         if not db_chat:
             return None
 
@@ -54,27 +60,29 @@ class GroupChatService:
         for field, value in update_data.items():
             setattr(db_chat, field, value)
 
-        db.commit()
-        db.refresh(db_chat)
+        await db.commit()
+        await db.refresh(db_chat)
         return db_chat
 
     @staticmethod
-    def delete_message(db: Session, message_id: uuid.UUID) -> bool:
-        db_chat = db.query(GroupChat).filter(GroupChat.id == message_id).first()
+    async def delete_group_chat(db: AsyncSession, message_id: uuid.UUID) -> bool:
+        result = await db.execute(select(GroupChat).filter(GroupChat.id == message_id))
+        db_chat = result.scalar_one_or_none()
         if not db_chat:
             return False
 
-        db.delete(db_chat)
-        db.commit()
+        await db.delete(db_chat)
+        await db.commit()
         return True
 
     @staticmethod
-    def toggle_status(db: Session, message_id: uuid.UUID) -> Optional[GroupChat]:
-        db_chat = db.query(GroupChat).filter(GroupChat.id == message_id).first()
+    async def toggle_status(db: AsyncSession, message_id: uuid.UUID) -> Optional[GroupChat]:
+        result = await db.execute(select(GroupChat).filter(GroupChat.id == message_id))
+        db_chat = result.scalar_one_or_none()
         if not db_chat:
             return None
 
         db_chat.status = not db_chat.status
-        db.commit()
-        db.refresh(db_chat)
+        await db.commit()
+        await db.refresh(db_chat)
         return db_chat

@@ -3,13 +3,12 @@ from fastapi import APIRouter, Query, HTTPException, Depends
 from app.models.preferences import UserPreferenceResponse
 from typing import List, Optional
 import uuid
-import app.neo4j_client as neo4j_client
 from app.services.preference_service import PreferenceService
 from app.services.user import UserService
 from app.neo4j_client import Neo4jClient
 from app.models.preference import PreferencesModel
 from app.database import get_db
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 import textwrap
 from app.middleware.verify_session import get_verify_session
 
@@ -21,7 +20,7 @@ neo4j_client = Neo4jClient()
 @router.get("/preferences/user/{user_id}", response_model=UserPreferenceResponse)
 async def obtener_preferencias_usuario(
     user_id: uuid.UUID,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Obtener las preferencias de un usuario específico.
@@ -34,7 +33,7 @@ async def obtener_preferencias_usuario(
     """
     try:
         # Verificar que el usuario existe
-        user = UserService.get_user_by_id(db, user_id)
+        user = await UserService.get_user_by_id(db, user_id)
         if not user:
             raise HTTPException(
                 status_code=404, 
@@ -63,7 +62,7 @@ async def obtener_preferencias_usuario(
 @router.get("/preferences/users", response_model=UserPreferenceResponse)
 async def obtener_preferencias_usuarios(
     group_id: uuid.UUID = Query(..., description="ID del grupo para obtener preferencias de todos sus usuarios"),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Obtener las preferencias de todos los usuarios de un grupo específico.
@@ -76,7 +75,7 @@ async def obtener_preferencias_usuarios(
     """
     try:
         # Obtener todos los usuarios del grupo usando UserService
-        users_in_group = UserService.get_user_by_group_id(db, group_id)
+        users_in_group = await UserService.get_user_by_group_id(db, group_id)
         
         if not users_in_group:
             raise HTTPException(
@@ -100,7 +99,7 @@ async def obtener_preferencias_usuarios(
 
 
 @router.post("/preferences/users")
-def create_preferences_user(data:PreferencesModel,current_user = Depends(get_verify_session),db: Session = Depends(get_db)):
+async def create_preferences_user(data:PreferencesModel,current_user = Depends(get_verify_session),db: AsyncSession = Depends(get_db)):
     """
     Create prefereces for a user
     Args:
@@ -110,7 +109,7 @@ def create_preferences_user(data:PreferencesModel,current_user = Depends(get_ver
     Returns:
         array of preferences
     """
-    user = UserService.get_user_by_id(db,current_user.id)
+    user = await UserService.get_user_by_id(db,current_user.id)
     if not user:
         raise HTTPException(
             status_code=404,
@@ -150,13 +149,13 @@ def create_preferences_user(data:PreferencesModel,current_user = Depends(get_ver
         return {"error": str(e)}
 
 @router.get("/preferences/debug/neo4j/{user_id}")
-async def debug_neo4j_data(user_id: uuid.UUID, db: Session = Depends(get_db)):
+async def debug_neo4j_data(user_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """
     Endpoint de debug para verificar qué datos hay en Neo4j para un usuario específico
     """
     try:
         # Verificar que el usuario existe
-        user = UserService.get_user_by_id(db, user_id)
+        user = await UserService.get_user_by_id(db, user_id)
         if not user:
             raise HTTPException(
                 status_code=404, 
