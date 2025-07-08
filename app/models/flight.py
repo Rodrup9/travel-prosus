@@ -11,7 +11,7 @@ from datetime import datetime
 class Flight(Base):
     __tablename__ = "flights"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     
     trip_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("trips.id", ondelete="CASCADE"))

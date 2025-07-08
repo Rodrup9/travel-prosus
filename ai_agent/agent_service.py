@@ -7,30 +7,30 @@ from typing import List, Optional, Dict, Any
 import json
 import uuid
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from .config import settings
 from .models import TripContext, AgentResponse, ChatMessage, UserPreferences
 from .travel_tools import TravelPriceSearcher
 from .travel_service import TravelService
-from app.services.chat_service import ChatService
+from .chat_service_sync import ChatServiceSync
 
 class TripPlannerAgent:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.client = groq.Groq(api_key=settings.GROQ_API_KEY)
         self.travel_service = TravelService(
             db=db,
             api_key=settings.AMADEUS_API_KEY,
             api_secret=settings.AMADEUS_API_SECRET
         )
-        self.chat_service = ChatService(db=db)
+        self.chat_service = ChatServiceSync(db=db)
         self.db = db
         
-    def _build_prompt(self, context: TripContext) -> str:
+    async def _build_prompt(self, context: TripContext) -> str:
         """
         Construye el prompt para el agente de IA basado en el contexto del viaje y el historial
         """
         # Obtener el contexto del grupo
-        group_context = self.chat_service.get_group_context(context.group_id)
+        group_context = await self.chat_service.get_group_context(context.group_id)
         
         # Extraer información de los participantes
         participants_info = []
@@ -39,7 +39,7 @@ class TripPlannerAgent:
         
         for user in context.participants:
             # Obtener el contexto del usuario
-            user_context = self.chat_service.get_user_context(user.user_id)
+            user_context = await self.chat_service.get_user_context(user.user_id)
             
             user_info = f"Usuario {user.name} ({user.user_id}):\n"
             user_info += f"- Destinos preferidos: {', '.join(user.destinations)}\n"
@@ -117,7 +117,7 @@ Por favor, estructura tu respuesta en formato JSON con los siguientes campos:
 
         return prompt
         
-    def _process_tool_calls(self, tool_calls: List[Any], trip_id: uuid.UUID) -> Dict[str, Any]:
+    async def _process_tool_calls(self, tool_calls: List[Any], trip_id: uuid.UUID) -> Dict[str, Any]:
         """
         Procesa las llamadas a herramientas del modelo
         """
@@ -153,60 +153,72 @@ Por favor, estructura tu respuesta en formato JSON con los siguientes campos:
                         check_out = check_out_date.strftime("%Y-%m-%d")
                     
                     if search_type == "flight":
-                        # Asumimos que location tiene formato "ORIGIN-DESTINATION"
-                        origin, destination = location.split("-")
-                        # Limpiar resultados anteriores
-                        self.travel_service.clear_trip_results(trip_id)
-                        # Buscar y guardar nuevos resultados
-                        flights = self.travel_service.search_and_save_flights(
-                            trip_id=trip_id,
-                            origin=origin,
-                            destination=destination,
-                            departure_date=check_in,
-                            return_date=check_out if len(dates) > 1 else None
-                        )
-                        results[f"flights_{origin}_{destination}"] = self.travel_service.format_saved_results(flights=flights)
+                        try:
+                            # Asumimos que location tiene formato "ORIGEN-DESTINATION"
+                            origin, destination = location.split("-")
+                            # Limpiar resultados anteriores
+                            await self.travel_service.clear_trip_results(trip_id)
+                            # Buscar y guardar nuevos resultados
+                            flights = await self.travel_service.search_and_save_flights(
+                                trip_id=trip_id,
+                                origin=origin,
+                                destination=destination,
+                                departure_date=check_in,
+                                return_date=check_out if len(dates) > 1 else None
+                            )
+                            results[f"flights_{origin}_{destination}"] = await self.travel_service.format_saved_results(flights=flights)
+                        except Exception as e:
+                            # Si hay error con Amadeus, lanzar el error
+                            print(f"Error con Amadeus para vuelos: {e}")
+                            raise e
                         
                     elif search_type == "hotel":
-                        # Limpiar resultados anteriores
-                        self.travel_service.clear_trip_results(trip_id)
-                        # Buscar y guardar nuevos resultados
-                        hotels = self.travel_service.search_and_save_hotels(
-                            trip_id=trip_id,
-                            city=location,
-                            check_in=check_in,
-                            check_out=check_out,
-                            guests=2  # Valor por defecto
-                        )
-                        results[f"hotels_{location}"] = self.travel_service.format_saved_results(hotels=hotels)
+                        try:
+                            # Limpiar resultados anteriores
+                            await self.travel_service.clear_trip_results(trip_id)
+                            # Buscar y guardar nuevos resultados
+                            hotels = await self.travel_service.search_and_save_hotels(
+                                trip_id=trip_id,
+                                city=location,
+                                check_in=check_in,
+                                check_out=check_out,
+                                guests=2  # Valor por defecto
+                            )
+                            results[f"hotels_{location}"] = await self.travel_service.format_saved_results(hotels=hotels)
+                        except Exception as e:
+                            # Si hay error con Amadeus, lanzar el error
+                            print(f"Error con Amadeus para hoteles: {e}")
+                            raise e
                         
-                elif tool_name == "search_web":
-                    query = arguments.get("query")
-                    if not query:
-                        raise ValueError("Se requiere una consulta para la búsqueda web")
-                    results[f"web_search_{query[:30]}"] = self.search_web(query)
+                # Eliminar bloques para search_web y get_weather
+                # elif tool_name == "search_web":
+                #     query = arguments.get("query")
+                #     if not query:
+                #         raise ValueError("Se requiere una consulta para la búsqueda web")
+                #     results[f"web_search_{query[:30]}"] = await self.search_web(query)
                     
-                elif tool_name == "get_weather":
-                    location = arguments.get("location")
-                    dates = arguments.get("dates", [])
-                    if not location:
-                        raise ValueError("Se requiere una ubicación para el pronóstico")
-                    results[f"weather_{location}"] = self.get_weather(location, dates)
+                # elif tool_name == "get_weather":
+                #     location = arguments.get("location")
+                #     dates = arguments.get("dates", [])
+                #     if not location:
+                #         raise ValueError("Se requiere una ubicación para el pronóstico")
+                #     results[f"weather_{location}"] = await self.get_weather(location, dates)
                     
             except Exception as e:
-                results[f"error_{tool_name}"] = self._handle_tool_error(tool_name, e)
+                print(f"Error en herramienta {tool_name}: {e}")
+                results[f"error_{tool_name}"] = await self._handle_tool_error(tool_name, e)
                 
         return results
         
-    def generate_itinerary(self, context: TripContext, trip_id: uuid.UUID) -> AgentResponse:
+    async def generate_itinerary(self, context: TripContext, trip_id: uuid.UUID) -> AgentResponse:
         """
         Genera un itinerario basado en el contexto del viaje
         """
         try:
             # Validar el contexto antes de procesar
-            self._validate_trip_context(context)
+            await self._validate_trip_context(context)
             
-            prompt = self._build_prompt(context)
+            prompt = await self._build_prompt(context)
             
             # Primera llamada para obtener los requisitos de búsqueda
             completion = self.client.chat.completions.create(
@@ -271,7 +283,7 @@ Por favor, estructura tu respuesta en formato JSON con los siguientes campos:
             
             if hasattr(response, 'tool_calls') and response.tool_calls:
                 # Procesar las llamadas a herramientas y obtener resultados
-                tool_results = self._process_tool_calls(response.tool_calls, trip_id)
+                tool_results = await self._process_tool_calls(response.tool_calls, trip_id)
                 
                 # Segunda llamada incluyendo los resultados de las búsquedas
                 final_prompt = f"""Basado en las búsquedas realizadas, aquí están los resultados:
@@ -296,12 +308,12 @@ Incluye recomendaciones específicas basadas en el clima y la información de lo
                 )
                 
                 return AgentResponse(
-                    itinerary=final_completion.choices[0].message.content,
+                    itinerary=final_completion.choices[0].message.content or "",
                     reasoning="Itinerario generado basado en precios reales, clima y preferencias del grupo"
                 )
             
             return AgentResponse(
-                itinerary=response.content,
+                itinerary=response.content or "",
                 reasoning="Itinerario generado basado en preferencias del grupo"
             )
             
@@ -311,38 +323,12 @@ Incluye recomendaciones específicas basadas en el clima y la información de lo
                 error=f"Error generando el itinerario: {str(e)}"
             )
 
-    def search_web(self, query: str) -> Dict[str, Any]:
-        """Busca información actualizada sobre destinos y atracciones"""
-        try:
-            # Usar la herramienta web_search para obtener información actualizada
-            search_results = {
-                "query": query,
-                "results": "Función simulada: Aquí se integraría la búsqueda web real",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            return search_results
-            
-        except Exception as e:
-            return self._handle_tool_error("search_web", e)
+    # Eliminar search_web y get_weather simulados
+    # El agente ahora solo usa Groq compound-beta para obtener información real
 
-    def get_weather(self, location: str, dates: List[str]) -> Dict[str, Any]:
-        """Obtiene el pronóstico del tiempo para una ubicación"""
-        try:
-            # Construir la consulta para el clima
-            weather_info = {
-                "location": location,
-                "dates": dates,
-                "forecast": "Función simulada: Aquí se integraría el pronóstico real",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            return weather_info
-            
-        except Exception as e:
-            return self._handle_tool_error("get_weather", e)
+    # Puedes dejar funciones utilitarias si son necesarias, pero no datos simulados
 
-    def _handle_tool_error(self, tool_name: str, error: Exception) -> Dict[str, str]:
+    async def _handle_tool_error(self, tool_name: str, error: Exception) -> Dict[str, str]:
         """Maneja errores de las herramientas de forma consistente"""
         error_response = {
             "error": str(error),
@@ -351,7 +337,7 @@ Incluye recomendaciones específicas basadas en el clima y la información de lo
         }
         return error_response
 
-    def _validate_trip_context(self, context: TripContext) -> None:
+    async def _validate_trip_context(self, context: TripContext) -> None:
         """Valida que el contexto del viaje tenga toda la información necesaria"""
         if not context.participants:
             raise ValueError("El contexto debe tener al menos un participante")
@@ -364,11 +350,114 @@ Incluye recomendaciones específicas basadas en el clima y la información de lo
                        participant.transport, participant.motivations]):
                 raise ValueError(f"El participante {participant.name} no tiene preferencias definidas")
 
-    def save_agent_response(self, group_id: uuid.UUID, response: str) -> None:
+    async def process_message(self, context: TripContext, trip_id: uuid.UUID) -> str:
+        """
+        Procesa un mensaje del usuario y genera una respuesta usando el modelo agentic tooling de Groq (compound-beta),
+        usando el contexto y preferencias del grupo y participantes.
+        """
+        try:
+            await self._validate_trip_context(context)
+            user_message = context.specific_requirements or "Ayúdame a planificar mi viaje"
+            requiere_itinerario = any(word in user_message.lower() for word in ["itinerario", "plan", "agenda", "actividades"])
+            prompt = f"""Eres un experto asistente de viajes. Un usuario te ha enviado este mensaje:
+
+\"{user_message}\"
+
+CONTEXTO DEL GRUPO:
+Grupo ID: {context.group_id}
+
+INFORMACIÓN DE PARTICIPANTES:
+{chr(10).join([f"- {p.name}: {', '.join(p.destinations)} destinos, {', '.join(p.activities)} actividades" for p in context.participants])}
+
+HISTORIAL RECIENTE:
+{chr(10).join([f"{msg.user_id}: {msg.message}" for msg in context.chat_history[-5:]])}
+
+Por favor, busca en la web vuelos y hoteles reales si es necesario, y responde con la información más actualizada y útil posible."""
+            if requiere_itinerario:
+                prompt += "\n\nEl usuario ha solicitado un itinerario. Genera un itinerario diario detallado para el viaje, incluyendo actividades recomendadas (por ejemplo, rutas de hiking, visitas a parques naturales, excursiones), lugares para comer (restaurantes locales, comida típica), y cualquier recomendación relevante para el destino y las fechas. Responde en formato JSON estructurado, por ejemplo:\n\n{\n  \"itinerary_days\": [\n    {\n      \"day\": 1,\n      \"activities\": [\n        {\n          \"activity\": \"Hiking en el Parque Nacional XYZ\",\n          \"location\": \"Parque Nacional XYZ\",\n          \"time\": \"09:00\"\n        },\n        {\n          \"activity\": \"Almuerzo en Restaurante ABC\",\n          \"location\": \"Restaurante ABC\",\n          \"time\": \"13:00\"\n        }\n      ]\n    },\n    ...\n  ]\n}\n\nIncluye actividades de hiking y recomendaciones gastronómicas locales."
+            else:
+                prompt += "\n\nSi el usuario solicita un itinerario, responde en formato JSON estructurado."
+            completion = self.client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "Eres un experto asistente de viajes que puede buscar en la web en tiempo real usando agentic tooling."},
+                    {"role": "user", "content": prompt}
+                ],
+                model="compound-beta",
+                temperature=settings.TEMPERATURE,
+                max_tokens=settings.MAX_TOKENS
+            )
+            response = completion.choices[0].message
+            return response.content or ""
+        except Exception as e:
+            return f"Lo siento, hubo un error procesando tu mensaje: {str(e)}"
+
+    async def _process_itinerary_response(self, response: str, trip_id: uuid.UUID) -> None:
+        """
+        Procesa la respuesta del agente para extraer y guardar itinerarios si están en formato JSON
+        """
+        try:
+            # Intentar parsear como JSON
+            import json
+            from datetime import datetime, date
+            from app.models.itinerary import Itinerary
+            
+            # Buscar JSON en la respuesta (puede estar mezclado con texto)
+            start_idx = response.find('{')
+            end_idx = response.rfind('}')
+            
+            if start_idx != -1 and end_idx != -1:
+                json_str = response[start_idx:end_idx + 1]
+                data = json.loads(json_str)
+                
+                # Verificar si es un itinerario
+                if 'itinerary_days' in data:
+                    # Limpiar itinerarios anteriores
+                    from sqlalchemy import update
+                    stmt = update(Itinerary).where(Itinerary.trip_id == trip_id).values(status=False)
+                    await self.db.execute(stmt)
+                    
+                    # Guardar nuevos itinerarios
+                    for day_data in data['itinerary_days']:
+                        day_num = day_data.get('day', 1)
+                        activities = day_data.get('activities', [])
+                        
+                        for activity in activities:
+                            # Calcular fecha basada en el día
+                            # Por ahora usamos la fecha actual + días
+                            activity_date = date.today() + timedelta(days=day_num - 1)
+                            
+                            # Parsear tiempo
+                            time_str = activity.get('time', '09:00')
+                            try:
+                                start_time = datetime.strptime(time_str, '%H:%M').time()
+                                # Asumir 2 horas por actividad
+                                end_time = datetime.strptime(time_str, '%H:%M').replace(hour=(int(time_str[:2]) + 2) % 24).time()
+                            except:
+                                start_time = None
+                                end_time = None
+                            
+                            itinerary = Itinerary(
+                                trip_id=trip_id,
+                                day=activity_date,
+                                activity=activity.get('activity', ''),
+                                location=activity.get('location', ''),
+                                start_time=start_time,
+                                end_time=end_time,
+                                status=True
+                            )
+                            self.db.add(itinerary)
+                    
+                    await self.db.commit()
+                    
+        except Exception as e:
+            # Si no es JSON válido o no es un itinerario, simplemente continuar
+            pass
+
+    async def save_agent_response(self, group_id: uuid.UUID, response: str) -> None:
         """
         Guarda la respuesta del agente en el historial de chat
         """
-        self.chat_service.save_message(
+        await self.chat_service.save_message(
             user_id=settings.AGENT_USER_ID,  # ID especial para el agente
             group_id=group_id,
             message=response

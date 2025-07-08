@@ -2,49 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.ia_chat import IAChatCreate, IAChatUpdate, IAChatResponse
 from app.services.ia_chat import IAChatService
+from app.services.travel_agent_service import TravelAgentService
 from app.database import get_db
 import uuid
 from typing import List, Optional
-from app.services.chat_service import ChatService
-from ai_agent.agent_service import TripPlannerAgent
 from pydantic import BaseModel
 from datetime import datetime
-import groq
-from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.sql import select
 from app.models.ia_chat import IAChat
 from app.models.group import Group
 from app.models.user import User
 from app.models.group_chat import GroupChat
-from dotenv import load_dotenv, dotenv_values
-import os
 
 router = APIRouter(prefix="/ia_chat", tags=["IA Chat"])
-
-# Cargar configuración
-def get_settings():
-    # Debug: Mostrar información sobre el archivo .env
-    current_dir = os.getcwd()
-    env_path = os.path.join(current_dir, ".env")
-    if os.path.exists(env_path):
-        with open(env_path, 'r') as f:
-            first_line = f.readline().strip()
-            print(f"Primera línea del archivo: {first_line}")
-    print("==========================================\n")
-    
-    env_values = dotenv_values(".env")
-    return {
-        "GROQ_API_KEY": env_values.get("GROQ_API_KEY", ""),
-        "MODEL_NAME": "llama-3.1-8b-instant",
-        "TEMPERATURE": 0.7,
-        "MAX_TOKENS": 4096,
-        "TOOLS_ENABLED": True,
-        "JSON_MODE": True,
-        "AMADEUS_API_KEY": env_values.get("AMADEUS_API_KEY", ""),
-        "AMADEUS_API_SECRET": env_values.get("AMADEUS_API_SECRET", ""),
-        "WEATHER_API_KEY": None,
-        "WEB_SEARCH_ENABLED": True
-    }
 
 async def validate_user_and_group(db: AsyncSession, user_id: uuid.UUID, group_id: uuid.UUID) -> bool:
     """Valida que el usuario y grupo existan en group_chat"""
@@ -62,8 +32,14 @@ async def test_config():
     Endpoint de prueba para verificar la configuración
     """
     try:
-        config = get_settings()
-        return {"message": "Configuración cargada correctamente", "config": config}
+        from ai_agent.config import settings
+        return {"message": "Configuración cargada correctamente", "config": {
+            "MODEL_NAME": settings.MODEL_NAME,
+            "TEMPERATURE": settings.TEMPERATURE,
+            "MAX_TOKENS": settings.MAX_TOKENS,
+            "TOOLS_ENABLED": settings.TOOLS_ENABLED,
+            "WEB_SEARCH_ENABLED": settings.WEB_SEARCH_ENABLED
+        }}
     except Exception as e:
         import traceback
         error_detail = traceback.format_exc()
@@ -132,13 +108,13 @@ class ChatResponse(BaseModel):
     user_id: uuid.UUID
     group_id: uuid.UUID
 
-@router.post("/send-message", response_model=ChatResponse)
+@router.post("/send-message")
 async def send_message_to_agent(
     chat_request: ChatRequest,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Envía un mensaje al agente y obtiene su respuesta.
+    Envía un mensaje al agente y obtiene su respuesta usando el agente de viajes personalizado.
     """
     try:
         # Validar que el usuario y grupo existan
@@ -149,9 +125,6 @@ async def send_message_to_agent(
                 detail="El usuario no pertenece al grupo o el grupo no existe"
             )
 
-        # Cargar configuración fresca
-        settings = get_settings()
-
         # Guardar el mensaje del usuario
         user_message = IAChat(
             user_id=chat_request.user_id,
@@ -161,77 +134,90 @@ async def send_message_to_agent(
         db.add(user_message)
         await db.flush()
         
-        # Obtener mensajes del chat
-        stmt = select(IAChat).where(
-            IAChat.group_id == chat_request.group_id,
-            IAChat.status == True
-        ).order_by(IAChat.created_at.desc()).limit(10)
-        result = await db.execute(stmt)
-        chat_history = result.scalars().all()
-
-        # Obtener información del grupo
-        stmt = select(Group).where(Group.id == chat_request.group_id)
-        result = await db.execute(stmt)
-        group = result.scalar_one_or_none()
-        group_context = {
-            "group": {
-                "id": str(group.id) if group else None,
-                "name": group.name if group else "Grupo sin nombre",
-                "host_id": str(group.host_id) if group else None
-            }
-        }
-    
-        # Construir el prompt para el agente
-        prompt = f"""Como asistente de viajes, ayuda a responder este mensaje considerando el contexto del grupo:
-
-Mensaje actual: {chat_request.message}
-
-Contexto del grupo:
-{group_context.get('group', {}).get('name', 'Grupo sin nombre')}
-
-Historial reciente:
-{chr(10).join([f"{msg.user_id}: {msg.message}" for msg in chat_history])}
-
-Por favor, proporciona una respuesta útil y relevante que ayude a planificar el viaje."""
-
-        # Crear cliente Groq y obtener respuesta
-        from groq import Groq
-        client = Groq(api_key=settings['GROQ_API_KEY'])
-        completion = await run_in_threadpool(
-            lambda: client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": "Eres un asistente experto en planificación de viajes, especializado en ayudar a grupos a organizar sus viajes."},
-                    {"role": "user", "content": prompt}
-                ],
-                model=settings['MODEL_NAME'],
-                temperature=settings['TEMPERATURE'],
-                max_tokens=settings['MAX_TOKENS']
-            )
-        )
+        # Crear el servicio del agente de viajes
+        travel_agent_service = TravelAgentService(db=db)
         
-        # Extraer la respuesta
-        agent_response = completion.choices[0].message.content
-        
-        # Guardar la respuesta del agente usando el ID del usuario que envió el mensaje
-        agent_message = IAChat(
-            user_id=chat_request.user_id,  # Usar el mismo usuario que envió el mensaje
+        # Procesar el mensaje con el agente
+        result = await travel_agent_service.process_message(
+            user_id=chat_request.user_id,
             group_id=chat_request.group_id,
-            message=agent_response
+            message=chat_request.message
         )
-        db.add(agent_message)
-        await db.flush()  # Asegurarnos de que tenemos el ID y created_at
-        await db.commit()  # Commit explícito para guardar todos los cambios
-    
-        return ChatResponse(
-            id=agent_message.id,
-            message=agent_message.message,
-            created_at=agent_message.created_at,
-            user_id=agent_message.user_id,
-            group_id=agent_message.group_id
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error del agente: {result['error']}"
+            )
+        
+        # Guardar la respuesta del agente
+        agent_message = await travel_agent_service.save_agent_response(
+            user_id=chat_request.user_id,
+            group_id=chat_request.group_id,
+            response=result["response"]
         )
-            
+        
+        await db.commit()
+
+        # Mejorar la presentación del mensaje para el usuario
+        import re
+        import json
+        raw_msg = agent_message.message
+        print("\n===== RESPUESTA CRUDA DEL AGENTE =====\n", raw_msg, "\n==============================\n")
+        # Buscar JSON en la respuesta
+        json_match = re.search(r'```json\s*([\s\S]+?)```', raw_msg)
+        pretty = ""
+        if json_match:
+            try:
+                data = json.loads(json_match.group(1))
+                # Mostrar itinerario si existe
+                if "itinerary_days" in data:
+                    pretty += "\n\n🗺️ **Itinerario sugerido:**\n"
+                    for day in data["itinerary_days"]:
+                        pretty += f"\n**Día {day.get('day', '?')}:**\n"
+                        for act in day.get("activities", []):
+                            pretty += f"- {act.get('activity', '')}"
+                            if act.get('location'):
+                                pretty += f" en {act['location']}"
+                            if act.get('time'):
+                                pretty += f" a las {act['time']}"
+                            pretty += "\n"
+                # Mostrar vuelos y hoteles si existen
+                if "vuelos" in data:
+                    pretty += "\n✈️ **Vuelos encontrados:**\n"
+                    for vuelo in data.get("vuelos", []):
+                        pretty += f"- **Origen:** {vuelo.get('origen', '-')}  |  **Destino:** {vuelo.get('destino', '-')}  |  **Precio:** {vuelo.get('precio', '-')}  |  **Aerolínea:** {vuelo.get('aerolínea', '-')}\n"
+                if "hoteles" in data:
+                    pretty += "\n🏨 **Hoteles encontrados:**\n"
+                    for hotel in data.get("hoteles", []):
+                        pretty += f"- **Ciudad:** {hotel.get('ciudad', '-')}  |  **Precio por noche:** {hotel.get('precio', '-')}\n"
+                fechas = data.get("fechas", {})
+                if fechas:
+                    pretty += f"\n📅 **Fechas del viaje:** {fechas.get('inicio', '-')} al {fechas.get('fin', '-')}\n"
+                pretty += "---\n"
+            except Exception:
+                pretty = ""
+        # Eliminar frases técnicas y redundantes
+        resumen = raw_msg
+        resumen = re.sub(r'A continuación[\s\S]+?formato JSON estructurado:', '', resumen, flags=re.IGNORECASE)
+        resumen = re.sub(r'A continuación[\s\S]+?en formato JSON:', '', resumen, flags=re.IGNORECASE)
+        resumen = re.sub(r'La información sobre vuelos[\s\S]+?es la siguiente:', '', resumen, flags=re.IGNORECASE)
+        resumen = re.sub(r'```json[\s\S]+?```', '', resumen)
+        resumen = re.sub(r'\n{2,}', '\n', resumen)
+        resumen = resumen.strip()
+        # Si el resumen termina con una despedida, la dejamos, si no, solo mostramos la tabla bonita
+        if pretty:
+            despedida_match = re.search(r'(¡Disfruta tu viaje!|Espero que esta información te sea útil[\s\S]+)', resumen)
+            despedida = despedida_match.group(1) if despedida_match else ''
+            final_msg = f"{pretty}\n{despedida}".strip()
+        else:
+            final_msg = resumen
+        # Limpiar saltos de línea extra
+        final_msg = re.sub(r'\n{3,}', '\n\n', final_msg)
+        return {"message": final_msg}
+        
     except Exception as e:
-        await db.rollback()  # Rollback en caso de error
+        await db.rollback()
         # Debug: Imprimir el error completo
         import traceback
         raise HTTPException(

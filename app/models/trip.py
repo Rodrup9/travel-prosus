@@ -25,7 +25,6 @@ class Trip(Base):
     status: Mapped[bool] = mapped_column(Boolean, default=True)
 
     group = relationship("Group", back_populates="trips")
-    votes = relationship("Vote", back_populates="trip")
     flights = relationship("Flight", back_populates="trip")
     itineraries = relationship("Itinerary", back_populates="trip")
     hotels = relationship("Hotel", back_populates="trip")

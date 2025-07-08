@@ -49,7 +49,8 @@ class TravelPriceSearcher:
     def __init__(self, api_key: str, api_secret: str):
         self.api_key = api_key
         self.api_secret = api_secret
-        self.base_url = "https://test.api.amadeus.com/v1"  # URL base de Amadeus
+        # Usar URL de sandbox por defecto (tu key es de sandbox)
+        self.base_url = "https://test.api.amadeus.com"  # URL de sandbox
         self.access_token = None
         self._token_expiry = None
         
@@ -101,7 +102,7 @@ class TravelPriceSearcher:
         if not self.access_token:
             self._get_access_token()
             
-        endpoint = f"{self.base_url}/shopping/flight-offers"
+        endpoint = f"{self.base_url}/v1/shopping/flight-offers"
         
         params = {
             "originLocationCode": origin,
@@ -171,7 +172,7 @@ class TravelPriceSearcher:
         if not self.access_token:
             self._get_access_token()
             
-        endpoint = f"{self.base_url}/shopping/hotel-offers"
+        endpoint = f"{self.base_url}/v2/shopping/hotel-offers"
         
         params = {
             "cityCode": city,
