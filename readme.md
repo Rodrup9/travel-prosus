@@ -1,4 +1,4 @@
-# 🌍 Travel Prosus - Plataforma de Planificación de Viajes con IA
+# 🌍 Travel Prosus - AI-Powered Travel Planning Platform
 
 <div align="center">
   <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
@@ -9,104 +9,104 @@
   <img src="https://img.shields.io/badge/Groq-FF6B35?style=for-the-badge&logo=groq&logoColor=white" alt="Groq">
 </div>
 
-## 📖 Descripción
+## 📖 Description
 
-Travel Prosus es una plataforma avanzada de planificación de viajes que utiliza inteligencia artificial para crear experiencias de viaje personalizadas. La aplicación combina tecnologías modernas como FastAPI, Neo4j, Supabase y WebSockets para ofrecer una experiencia completa de planificación grupal de viajes.
+Travel Prosus is an advanced travel planning platform that uses artificial intelligence to create personalized travel experiences. The application combines modern technologies like FastAPI, Neo4j, Supabase, and WebSockets to offer a complete group travel planning experience.
 
-### 🚀 Características Principales
+### 🚀 Key Features
 
-- **🤖 Agente de IA Inteligente**: Utiliza Groq LLaMA 3.1 para recomendaciones personalizadas
-- **👥 Planificación Grupal**: Colaboración en tiempo real entre miembros del grupo
-- **💬 Chat en Tiempo Real**: Comunicación instantánea con WebSockets
-- **✈️ Integración con Amadeus**: Búsqueda de vuelos y hoteles en tiempo real
-- **📊 Sistema de Preferencias**: Almacenamiento inteligente en Neo4j
-- **🗳️ Sistema de Votación**: Decisiones democráticas para el grupo
-- **📱 API REST Completa**: Endpoints para todas las funcionalidades
-- **🔐 Autenticación Segura**: Sistema de autenticación con Supabase
+- **🤖 Intelligent AI Agent**: Uses Groq LLaMA 3.1 for personalized recommendations
+- **👥 Group Planning**: Real-time collaboration between group members
+- **💬 Real-time Chat**: Instant communication with WebSockets
+- **✈️ Amadeus Integration**: Real-time flight and hotel search
+- **📊 Preference System**: Smart storage in Neo4j
+- **🗳️ Voting System**: Democratic decisions for the group
+- **📱 Complete REST API**: Endpoints for all functionalities
+- **🔐 Secure Authentication**: Authentication system with Supabase
 
-## 🏗️ Arquitectura del Sistema
+## 🏗️ System Architecture
 
 ```
 Travel Prosus
 ├── 🧠 AI Agent (Groq LLaMA 3.1)
-│   ├── Recomendaciones personalizadas
-│   ├── Búsqueda de vuelos/hoteles
-│   └── Análisis de preferencias
+│   ├── Personalized recommendations
+│   ├── Flight/hotel search
+│   └── Preference analysis
 ├── 🏛️ Backend (FastAPI)
-│   ├── API REST
+│   ├── REST API
 │   ├── WebSocket Chat
-│   ├── Autenticación
-│   └── Gestión de datos
-├── 📊 Bases de Datos
-│   ├── PostgreSQL (Supabase) - Datos principales
-│   └── Neo4j - Preferencias y relaciones
-└── 🌐 Servicios Externos
-    ├── Amadeus API - Vuelos y hoteles
-    ├── Supabase - Base de datos y auth
-    └── Groq - Inteligencia artificial
+│   ├── Authentication
+│   └── Data management
+├── 📊 Databases
+│   ├── PostgreSQL (Supabase) - Main data
+│   └── Neo4j - Preferences and relationships
+└── 🌐 External Services
+    ├── Amadeus API - Flights and hotels
+    ├── Supabase - Database and auth
+    └── Groq - Artificial intelligence
 ```
 
-## 🛠️ Tecnologías Utilizadas
+## 🛠️ Technologies Used
 
 ### Backend
-- **FastAPI**: Framework web moderno y rápido
-- **SQLModel**: ORM asíncrono para PostgreSQL
-- **Supabase**: Base de datos PostgreSQL como servicio
-- **Neo4j**: Base de datos de grafos para preferencias
-- **WebSockets**: Comunicación en tiempo real
-- **Uvicorn**: Servidor ASGI
+- **FastAPI**: Modern and fast web framework
+- **SQLModel**: Asynchronous ORM for PostgreSQL
+- **Supabase**: PostgreSQL database as a service
+- **Neo4j**: Graph database for preferences
+- **WebSockets**: Real-time communication
+- **Uvicorn**: ASGI server
 
-### IA y Servicios
-- **Groq**: API de IA con LLaMA 3.1
-- **Amadeus API**: Búsqueda de vuelos y hoteles
-- **Neo4j Aura**: Base de datos de grafos en la nube
+### AI and Services
+- **Groq**: AI API with LLaMA 3.1
+- **Amadeus API**: Flight and hotel search
+- **Neo4j Aura**: Cloud graph database
 
-### Herramientas de Desarrollo
-- **Python 3.12+**: Lenguaje principal
-- **Pydantic**: Validación de datos
-- **python-dotenv**: Gestión de variables de entorno
-- **AsyncPG**: Driver asíncrono para PostgreSQL
+### Development Tools
+- **Python 3.12+**: Main language
+- **Pydantic**: Data validation
+- **python-dotenv**: Environment variable management
+- **AsyncPG**: Asynchronous PostgreSQL driver
 
-## 📋 Requisitos Previos
+## 📋 Prerequisites
 
-- Python 3.12 o superior
-- Node.js 18+ (para el frontend)
-- Cuenta en Supabase
-- Cuenta en Neo4j Aura
-- API Key de Amadeus
-- API Key de Groq
+- Python 3.12 or higher
+- Node.js 18+ (for frontend)
+- Supabase account
+- Neo4j Aura account
+- Amadeus API Key
+- Groq API Key
 
-## 🚀 Instalación y Configuración
+## 🚀 Installation and Setup
 
-### 1. Clonar el Repositorio
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/tu-usuario/travel-prosus.git
+git clone https://github.com/your-username/travel-prosus.git
 cd travel-prosus
 ```
 
-### 2. Configurar Entorno Virtual
+### 2. Set Up Virtual Environment
 
 ```bash
-# Crear entorno virtual
+# Create virtual environment
 python -m venv venv
 
-# Activar entorno virtual
+# Activate virtual environment
 # Windows
 venv\Scripts\activate
 # macOS/Linux
 source venv/bin/activate
 ```
 
-### 3. Instalar Dependencias
+### 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configurar Variables de Entorno
+### 4. Configure Environment Variables
 
-Crea un archivo `.env` en la raíz del proyecto:
+Create a `.env` file in the project root:
 
 ```env
 # Neo4j Configuration
@@ -136,107 +136,107 @@ JSON_MODE=true
 WEB_SEARCH_ENABLED=true
 ```
 
-### 5. Configurar Bases de Datos
+### 5. Configure Databases
 
 #### PostgreSQL (Supabase)
-1. Crea un proyecto en [Supabase](https://supabase.com)
-2. Obtén la URL y la clave anónima
-3. Las tablas se crearán automáticamente al iniciar la aplicación
+1. Create a project on [Supabase](https://supabase.com)
+2. Get the URL and anonymous key
+3. Tables will be created automatically when starting the application
 
 #### Neo4j
-1. Crea una instancia en [Neo4j Aura](https://neo4j.com/aura/)
-2. Obtén las credenciales de conexión
-3. La base de datos se configurará automáticamente
+1. Create an instance on [Neo4j Aura](https://neo4j.com/aura/)
+2. Get the connection credentials
+3. The database will be configured automatically
 
-### 6. Iniciar el Servidor
+### 6. Start the Server
 
 ```bash
-# Opción 1: Usar el script de PowerShell (Windows)
+# Option 1: Use PowerShell script (Windows)
 .\start_server.ps1
 
-# Opción 2: Usar uvicorn directamente
+# Option 2: Use uvicorn directly
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# Opción 3: Usar el script de Python
+# Option 3: Use Python script
 python start_server.py
 ```
 
-El servidor estará disponible en `http://localhost:8000`
+The server will be available at `http://localhost:8000`
 
-## 📚 Documentación de API
+## 📚 API Documentation
 
-### Endpoints Principales
+### Main Endpoints
 
-#### 🔐 Autenticación
-- `POST /auth/login` - Iniciar sesión
-- `POST /auth/register` - Registrar usuario
-- `POST /auth/logout` - Cerrar sesión
+#### 🔐 Authentication
+- `POST /auth/login` - Login
+- `POST /auth/register` - Register user
+- `POST /auth/logout` - Logout
 
-#### 👥 Usuarios
-- `GET /users` - Obtener todos los usuarios
-- `GET /users/{user_id}` - Obtener usuario específico
-- `POST /users` - Crear nuevo usuario
-- `PUT /users/{user_id}` - Actualizar usuario
-- `DELETE /users/{user_id}` - Eliminar usuario
+#### 👥 Users
+- `GET /users` - Get all users
+- `GET /users/{user_id}` - Get specific user
+- `POST /users` - Create new user
+- `PUT /users/{user_id}` - Update user
+- `DELETE /users/{user_id}` - Delete user
 
-#### 🏠 Grupos
-- `GET /groups` - Obtener todos los grupos
-- `GET /groups/{group_id}` - Obtener grupo específico
-- `POST /groups` - Crear nuevo grupo
-- `PUT /groups/{group_id}` - Actualizar grupo
-- `DELETE /groups/{group_id}` - Eliminar grupo
+#### 🏠 Groups
+- `GET /groups` - Get all groups
+- `GET /groups/{group_id}` - Get specific group
+- `POST /groups` - Create new group
+- `PUT /groups/{group_id}` - Update group
+- `DELETE /groups/{group_id}` - Delete group
 
-#### ✈️ Vuelos
-- `GET /flights` - Obtener vuelos
-- `GET /flights/{flight_id}` - Obtener vuelo específico
-- `POST /flights` - Crear vuelo
-- `PUT /flights/{flight_id}` - Actualizar vuelo
-- `DELETE /flights/{flight_id}` - Eliminar vuelo
+#### ✈️ Flights
+- `GET /flights` - Get flights
+- `GET /flights/{flight_id}` - Get specific flight
+- `POST /flights` - Create flight
+- `PUT /flights/{flight_id}` - Update flight
+- `DELETE /flights/{flight_id}` - Delete flight
 
-#### 🏨 Hoteles
-- `GET /hotels` - Obtener hoteles
-- `GET /hotels/{hotel_id}` - Obtener hotel específico
-- `POST /hotels` - Crear hotel
-- `PUT /hotels/{hotel_id}` - Actualizar hotel
-- `DELETE /hotels/{hotel_id}` - Eliminar hotel
+#### 🏨 Hotels
+- `GET /hotels` - Get hotels
+- `GET /hotels/{hotel_id}` - Get specific hotel
+- `POST /hotels` - Create hotel
+- `PUT /hotels/{hotel_id}` - Update hotel
+- `DELETE /hotels/{hotel_id}` - Delete hotel
 
-#### 🗳️ Votaciones
-- `GET /votes` - Obtener votaciones
-- `POST /votes` - Crear votación
-- `GET /votes/{vote_id}` - Obtener votación específica
+#### 🗳️ Voting
+- `GET /votes` - Get votes
+- `POST /votes` - Create vote
+- `GET /votes/{vote_id}` - Get specific vote
 
-#### 📊 Preferencias
-- `GET /preferences/user/{user_id}` - Obtener preferencias de usuario
-- `GET /preferences/users?group_id={group_id}` - Obtener preferencias del grupo
+#### 📊 Preferences
+- `GET /preferences/user/{user_id}` - Get user preferences
+- `GET /preferences/users?group_id={group_id}` - Get group preferences
 
-### 🔍 Documentación Interactiva
+### 🔍 Interactive Documentation
 
-Una vez que el servidor esté en funcionamiento, puedes acceder a:
+Once the server is running, you can access:
 
 - **Swagger UI**: `http://localhost:8000/docs`
 - **ReDoc**: `http://localhost:8000/redoc`
 
-## 🤖 Agente de IA
+## 🤖 AI Agent
 
-### Funcionalidades del Agente
+### Agent Features
 
-El agente de IA utiliza **Groq LLaMA 3.1** para proporcionar:
+The AI agent uses **Groq LLaMA 3.1** to provide:
 
-1. **Recomendaciones de Destinos**: Basadas en preferencias del usuario
-2. **Búsqueda de Vuelos**: Integración con Amadeus API
-3. **Búsqueda de Hoteles**: Recomendaciones personalizadas
-4. **Análisis de Preferencias**: Usando Neo4j para almacenar patrones
-5. **Itinerarios Personalizados**: Creación automática de planes de viaje
+1. **Destination Recommendations**: Based on user preferences
+2. **Flight Search**: Integration with Amadeus API
+3. **Hotel Search**: Personalized recommendations
+4. **Preference Analysis**: Using Neo4j to store patterns
+5. **Custom Itineraries**: Automatic travel plan creation
 
-### Herramientas del Agente
+### Agent Tools
 
 ```python
-# Ejemplo de uso del agente
+# Example of agent usage
 from ai_agent.agent_service import AgentService
 
 agent = AgentService()
 
-# Búsqueda de vuelos
+# Flight search
 flights = await agent.search_flights(
     origin="MAD",
     destination="BCN",
@@ -244,7 +244,7 @@ flights = await agent.search_flights(
     return_date="2024-12-05"
 )
 
-# Recomendaciones de hoteles
+# Hotel recommendations
 hotels = await agent.search_hotels(
     destination="Barcelona",
     check_in="2024-12-01",
@@ -252,64 +252,64 @@ hotels = await agent.search_hotels(
 )
 ```
 
-## 💬 Chat en Tiempo Real
+## 💬 Real-time Chat
 
-### Características del Chat
+### Chat Features
 
-- **WebSocket**: Comunicación bidireccional instantánea
-- **Persistencia**: Mensajes guardados en Supabase
-- **Indicadores de Escritura**: Muestra cuando alguien está escribiendo
-- **Reconexión Automática**: Manejo de desconexiones
-- **Múltiples Canales**: Chat por grupo de viaje
+- **WebSocket**: Instant bidirectional communication
+- **Persistence**: Messages saved in Supabase
+- **Typing Indicators**: Shows when someone is typing
+- **Auto-reconnection**: Handles disconnections
+- **Multiple Channels**: Chat per travel group
 
-### Conexión WebSocket
+### WebSocket Connection
 
 ```javascript
-// Ejemplo de conexión desde el frontend
+// Example connection from frontend
 const ws = new WebSocket('ws://localhost:8000/ws/chat/{group_id}');
 
 ws.onmessage = function(event) {
     const data = JSON.parse(event.data);
-    console.log('Mensaje recibido:', data);
+    console.log('Message received:', data);
 };
 
 ws.send(JSON.stringify({
     type: 'message',
-    content: 'Hola grupo!',
+    content: 'Hello group!',
     user_id: 'user-uuid'
 }));
 ```
 
-### Tipos de Mensajes
+### Message Types
 
-- **message**: Mensaje de texto normal
-- **typing**: Indicador de que el usuario está escribiendo
-- **system**: Mensajes del sistema
-- **ai_response**: Respuestas del agente de IA
+- **message**: Normal text message
+- **typing**: Typing indicator
+- **system**: System messages
+- **ai_response**: AI agent responses
 
 ## 🧪 Testing
 
-### Verificar CORS
+### Verify CORS
 
-Abre `cors_test.html` en tu navegador para probar la comunicación con el backend.
+Open `cors_test.html` in your browser to test backend communication.
 
-### Ejecutar Tests
+### Run Tests
 
 ```bash
-# Ejecutar tests de importación
+# Run import tests
 python test_server.py
 
-# Probar endpoints específicos
+# Test specific endpoints
 curl -X GET "http://localhost:8000/health"
 curl -X GET "http://localhost:8000/cors-test"
 ```
 
-## 📊 Estructura de Datos
+## 📊 Data Structure
 
-### Modelos Principales
+### Main Models
 
 ```python
-# Usuario
+# User
 class User:
     id: UUID
     username: str
@@ -317,7 +317,7 @@ class User:
     name: str
     created_at: datetime
 
-# Grupo
+# Group
 class Group:
     id: UUID
     name: str
@@ -325,7 +325,7 @@ class Group:
     created_by: UUID
     created_at: datetime
 
-# Viaje
+# Trip
 class Trip:
     id: UUID
     group_id: UUID
@@ -335,12 +335,12 @@ class Trip:
     budget: float
 ```
 
-## 🔧 Configuración Avanzada
+## 🔧 Advanced Configuration
 
-### Personalizar el Agente de IA
+### Customize AI Agent
 
 ```python
-# En ai_agent/config.py
+# In ai_agent/config.py
 class GroqSettings:
     MODEL_NAME: str = "llama-3.1-8b-instant"
     TEMPERATURE: float = 0.7
@@ -348,18 +348,18 @@ class GroqSettings:
     TOOLS_ENABLED: bool = True
 ```
 
-### Configurar Neo4j
+### Configure Neo4j
 
 ```python
-# Ejemplo de consulta de preferencias
+# Example preference query
 MATCH (u:User)-[:PREFERS]->(p:Preference)
 WHERE u.id_sql = $user_id
 RETURN p.category, p.value, p.weight
 ```
 
-## 🚀 Despliegue
+## 🚀 Deployment
 
-### Usando Docker
+### Using Docker
 
 ```dockerfile
 # Dockerfile
@@ -373,11 +373,11 @@ COPY . .
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-### Variables de Entorno para Producción
+### Production Environment Variables
 
 ```env
 # CORS Configuration
-CORS_ORIGINS=["https://tu-dominio.com", "https://www.tu-dominio.com"]
+CORS_ORIGINS=["https://your-domain.com", "https://www.your-domain.com"]
 
 # Database
 DATABASE_URL=postgresql://user:pass@production-host:5432/database
@@ -387,39 +387,39 @@ GROQ_API_KEY=production-key
 AMADEUS_API_KEY=production-key
 ```
 
-## 🔐 Seguridad
+## 🔐 Security
 
-### Configuración CORS
+### CORS Configuration
 
-Para producción, configura dominios específicos:
+For production, configure specific domains:
 
 ```python
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://tu-dominio.com"],
+    allow_origins=["https://your-domain.com"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 ```
 
-### Autenticación
+### Authentication
 
-El sistema utiliza Supabase Auth para:
-- Registro de usuarios
-- Inicio de sesión
-- Gestión de sesiones
-- Tokens JWT
+The system uses Supabase Auth for:
+- User registration
+- Login
+- Session management
+- JWT tokens
 
-## 📈 Monitoreo
+## 📈 Monitoring
 
 ### Health Checks
 
-- `GET /health` - Estado del servidor
-- `GET /pool-status` - Estado de la base de datos
-- `GET /` - Información general
+- `GET /health` - Server status
+- `GET /pool-status` - Database status
+- `GET /` - General information
 
-### Logs
+### Logging
 
 ```python
 import logging
@@ -428,48 +428,48 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 ```
 
-## 🤝 Contribuir
+## 🤝 Contributing
 
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit tus cambios (`git commit -m 'Añadir nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Abre un Pull Request
+1. Fork the project
+2. Create a feature branch (`git checkout -b feature/new-feature`)
+3. Commit your changes (`git commit -m 'Add new feature'`)
+4. Push to the branch (`git push origin feature/new-feature`)
+5. Open a Pull Request
 
-## 📄 Licencia
+## 📄 License
 
-Este proyecto está bajo la licencia MIT. Ver el archivo `LICENSE` para más detalles.
+This project is licensed under the MIT License. See the `LICENSE` file for details.
 
-## 🆘 Soporte
+## 🆘 Support
 
-Si tienes problemas o preguntas:
+If you have problems or questions:
 
-1. Revisa la documentación en `/docs`
-2. Consulta los issues existentes
-3. Crea un nuevo issue con detalles específicos
-4. Usa el archivo `CORS_SOLUTION.md` para problemas de CORS
+1. Check the documentation in `/docs`
+2. Check existing issues
+3. Create a new issue with specific details
+4. Use the `CORS_SOLUTION.md` file for CORS problems
 
-## 🏆 Características Destacadas
+## 🏆 Key Features
 
-- ✅ **API REST Completa** con FastAPI
-- ✅ **Chat en Tiempo Real** con WebSockets
-- ✅ **Inteligencia Artificial** con Groq LLaMA 3.1
-- ✅ **Base de Datos de Grafos** con Neo4j
-- ✅ **Integración con Amadeus** para vuelos y hoteles
-- ✅ **Sistema de Votación** democrático
-- ✅ **Preferencias Inteligentes** almacenadas en Neo4j
-- ✅ **Autenticación Segura** con Supabase
-- ✅ **Planificación Grupal** colaborativa
-- ✅ **Documentación Interactiva** con Swagger
+- ✅ **Complete REST API** with FastAPI
+- ✅ **Real-time Chat** with WebSockets
+- ✅ **Artificial Intelligence** with Groq LLaMA 3.1
+- ✅ **Graph Database** with Neo4j
+- ✅ **Amadeus Integration** for flights and hotels
+- ✅ **Voting System** democratic
+- ✅ **Smart Preferences** stored in Neo4j
+- ✅ **Secure Authentication** with Supabase
+- ✅ **Group Planning** collaborative
+- ✅ **Interactive Documentation** with Swagger
 
 ---
 
 <div align="center">
-  <p>Hecho con ❤️ para viajeros por viajeros</p>
+  <p>Made with ❤️ for travelers by travelers</p>
   <p>
-    <a href="https://localhost:8000/docs">📚 Documentación API</a> •
-    <a href="https://localhost:8000/health">🏥 Estado del Servidor</a> •
-    <a href="https://github.com/tu-usuario/travel-prosus/issues">🐛 Reportar Bug</a>
+    <a href="https://localhost:8000/docs">📚 API Documentation</a> •
+    <a href="https://localhost:8000/health">🏥 Server Status</a> •
+    <a href="https://github.com/your-username/travel-prosus/issues">🐛 Report Bug</a>
   </p>
 </div>
 

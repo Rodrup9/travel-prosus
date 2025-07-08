@@ -1,211 +1,211 @@
 # 📋 Changelog - Travel Prosus
 
-Todos los cambios importantes de este proyecto se documentarán en este archivo.
+All notable changes to this project will be documented in this file.
 
-El formato está basado en [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-y este proyecto sigue [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Sin Versión] - 2024-12-XX
+## [Unreleased] - 2024-12-XX
 
-### 🆕 Agregado
-- **Sistema de Autenticación**: Integración completa con Supabase Auth
-- **API REST Completa**: Endpoints CRUD para todos los modelos
-- **Agente de IA**: Integración con Groq LLaMA 3.1 para recomendaciones
-- **Chat en Tiempo Real**: WebSocket para comunicación grupal
-- **Base de Datos de Grafos**: Neo4j para almacenar preferencias de usuario
-- **Búsqueda de Vuelos**: Integración con Amadeus API
-- **Búsqueda de Hoteles**: Integración con Amadeus API
-- **Sistema de Votación**: Decisiones democráticas en grupos
-- **Gestión de Grupos**: Creación y administración de grupos de viaje
-- **Sistema de Preferencias**: Almacenamiento inteligente en Neo4j
-- **Middleware CORS**: Configuración completa para frontend-backend
+### 🆕 Added
+- **Authentication System**: Complete integration with Supabase Auth
+- **Complete REST API**: CRUD endpoints for all models
+- **AI Agent**: Integration with Groq LLaMA 3.1 for recommendations
+- **Real-time Chat**: WebSocket for group communication
+- **Graph Database**: Neo4j for storing user preferences
+- **Flight Search**: Integration with Amadeus API
+- **Hotel Search**: Integration with Amadeus API
+- **Voting System**: Democratic decisions in groups
+- **Group Management**: Creation and administration of travel groups
+- **Preference System**: Smart storage in Neo4j
+- **CORS Middleware**: Complete configuration for frontend-backend
 
-### 🔧 Técnico
-- **FastAPI**: Framework web principal
-- **SQLModel**: ORM para PostgreSQL
-- **AsyncPG**: Driver asíncrono para PostgreSQL
-- **WebSockets**: Comunicación en tiempo real
-- **Pydantic**: Validación de datos
-- **Uvicorn**: Servidor ASGI
+### 🔧 Technical
+- **FastAPI**: Main web framework
+- **SQLModel**: ORM for PostgreSQL
+- **AsyncPG**: Asynchronous driver for PostgreSQL
+- **WebSockets**: Real-time communication
+- **Pydantic**: Data validation
+- **Uvicorn**: ASGI server
 
-### 📚 Documentación
-- **README.md**: Documentación completa del proyecto
-- **DEVELOPER_GUIDE.md**: Guía técnica para desarrolladores
-- **CORS_SOLUTION.md**: Solución de problemas CORS
-- **realtime_chat_guide.md**: Guía de implementación del chat
+### 📚 Documentation
+- **README.md**: Complete project documentation
+- **DEVELOPER_GUIDE.md**: Technical guide for developers
+- **CORS_SOLUTION.md**: CORS troubleshooting solution
+- **realtime_chat_guide.md**: Chat implementation guide
 
-### 🛠️ Herramientas
-- **Scripts de Inicio**: PowerShell y Python
-- **Test de CORS**: Página HTML para verificar conectividad
-- **Health Checks**: Endpoints de monitoreo
-- **Logging**: Sistema de logs configurado
+### 🛠️ Tools
+- **Startup Scripts**: PowerShell and Python
+- **CORS Test**: HTML page to verify connectivity
+- **Health Checks**: Monitoring endpoints
+- **Logging**: Configured logging system
 
-### 🔐 Seguridad
-- **Autenticación JWT**: Tokens seguros con Supabase
-- **Middleware de Sesión**: Verificación de sesiones
-- **CORS Configurado**: Headers de seguridad
-- **Variables de Entorno**: Configuración segura
+### 🔐 Security
+- **JWT Authentication**: Secure tokens with Supabase
+- **Session Middleware**: Session verification
+- **CORS Configured**: Security headers
+- **Environment Variables**: Secure configuration
 
-### 🌐 Integraciones
-- **Supabase**: Base de datos PostgreSQL y autenticación
-- **Neo4j Aura**: Base de datos de grafos
-- **Groq**: API de inteligencia artificial
-- **Amadeus**: API de búsqueda de vuelos y hoteles
+### 🌐 Integrations
+- **Supabase**: PostgreSQL database and authentication
+- **Neo4j Aura**: Graph database
+- **Groq**: Artificial intelligence API
+- **Amadeus**: Flight and hotel search API
 
-### 📊 Modelos de Datos
-- **User**: Gestión de usuarios
-- **Group**: Grupos de viaje
-- **Trip**: Viajes y itinerarios
-- **Flight**: Información de vuelos
-- **Hotel**: Información de hoteles
-- **GroupMember**: Miembros de grupos
-- **GroupChat**: Mensajes de chat grupal
-- **IAChat**: Conversaciones con IA
-- **Vote**: Sistema de votación
-- **Preference**: Preferencias de usuario
+### 📊 Data Models
+- **User**: User management
+- **Group**: Travel groups
+- **Trip**: Trips and itineraries
+- **Flight**: Flight information
+- **Hotel**: Hotel information
+- **GroupMember**: Group members
+- **GroupChat**: Group chat messages
+- **IAChat**: AI conversations
+- **Vote**: Voting system
+- **Preference**: User preferences
 
-### 🚀 Endpoints Principales
+### 🚀 Main Endpoints
 
-#### Autenticación
-- `POST /auth/login` - Iniciar sesión
-- `POST /auth/register` - Registrar usuario
-- `POST /auth/logout` - Cerrar sesión
+#### Authentication
+- `POST /auth/login` - Login
+- `POST /auth/register` - Register user
+- `POST /auth/logout` - Logout
 
-#### Usuarios
-- `GET /users` - Listar usuarios
-- `GET /users/{user_id}` - Obtener usuario
-- `POST /users` - Crear usuario
-- `PUT /users/{user_id}` - Actualizar usuario
-- `DELETE /users/{user_id}` - Eliminar usuario
+#### Users
+- `GET /users` - List users
+- `GET /users/{user_id}` - Get user
+- `POST /users` - Create user
+- `PUT /users/{user_id}` - Update user
+- `DELETE /users/{user_id}` - Delete user
 
-#### Grupos
-- `GET /groups` - Listar grupos
-- `GET /groups/{group_id}` - Obtener grupo
-- `POST /groups` - Crear grupo
-- `PUT /groups/{group_id}` - Actualizar grupo
-- `DELETE /groups/{group_id}` - Eliminar grupo
+#### Groups
+- `GET /groups` - List groups
+- `GET /groups/{group_id}` - Get group
+- `POST /groups` - Create group
+- `PUT /groups/{group_id}` - Update group
+- `DELETE /groups/{group_id}` - Delete group
 
-#### Viajes
-- `GET /trips` - Listar viajes
-- `GET /trips/{trip_id}` - Obtener viaje
-- `POST /trips` - Crear viaje
-- `PUT /trips/{trip_id}` - Actualizar viaje
-- `DELETE /trips/{trip_id}` - Eliminar viaje
+#### Trips
+- `GET /trips` - List trips
+- `GET /trips/{trip_id}` - Get trip
+- `POST /trips` - Create trip
+- `PUT /trips/{trip_id}` - Update trip
+- `DELETE /trips/{trip_id}` - Delete trip
 
-#### Vuelos
-- `GET /flights` - Listar vuelos
-- `GET /flights/{flight_id}` - Obtener vuelo
-- `POST /flights` - Crear vuelo
-- `PUT /flights/{flight_id}` - Actualizar vuelo
-- `DELETE /flights/{flight_id}` - Eliminar vuelo
+#### Flights
+- `GET /flights` - List flights
+- `GET /flights/{flight_id}` - Get flight
+- `POST /flights` - Create flight
+- `PUT /flights/{flight_id}` - Update flight
+- `DELETE /flights/{flight_id}` - Delete flight
 
-#### Hoteles
-- `GET /hotels` - Listar hoteles
-- `GET /hotels/{hotel_id}` - Obtener hotel
-- `POST /hotels` - Crear hotel
-- `PUT /hotels/{hotel_id}` - Actualizar hotel
-- `DELETE /hotels/{hotel_id}` - Eliminar hotel
+#### Hotels
+- `GET /hotels` - List hotels
+- `GET /hotels/{hotel_id}` - Get hotel
+- `POST /hotels` - Create hotel
+- `PUT /hotels/{hotel_id}` - Update hotel
+- `DELETE /hotels/{hotel_id}` - Delete hotel
 
-#### Preferencias
-- `GET /preferences/user/{user_id}` - Preferencias de usuario
-- `GET /preferences/users?group_id={group_id}` - Preferencias de grupo
+#### Preferences
+- `GET /preferences/user/{user_id}` - User preferences
+- `GET /preferences/users?group_id={group_id}` - Group preferences
 
 #### WebSocket
-- `WS /ws/chat/{group_id}` - Chat en tiempo real
+- `WS /ws/chat/{group_id}` - Real-time chat
 
-#### Monitoreo
-- `GET /` - Información general
-- `GET /health` - Estado del sistema
-- `GET /pool-status` - Estado de la base de datos
-- `GET /cors-test` - Test de CORS
+#### Monitoring
+- `GET /` - General information
+- `GET /health` - System status
+- `GET /pool-status` - Database status
+- `GET /cors-test` - CORS test
 
-### 🔧 Configuración
-- **Variables de entorno**: Configuración completa en `.env`
-- **Base de datos**: Configuración asíncrona con SQLModel
-- **Neo4j**: Cliente configurado para preferencias
-- **CORS**: Middleware configurado para desarrollo
-- **Logging**: Sistema de logs estructurado
+### 🔧 Configuration
+- **Environment variables**: Complete configuration in `.env`
+- **Database**: Asynchronous configuration with SQLModel
+- **Neo4j**: Client configured for preferences
+- **CORS**: Middleware configured for development
+- **Logging**: Structured logging system
 
-### 📝 Archivos de Configuración
-- `.env` - Variables de entorno
-- `requirements.txt` - Dependencias Python
-- `start_server.py` - Script de inicio Python
-- `start_server.ps1` - Script de inicio PowerShell
-- `test_server.py` - Script de testing
-- `cors_test.html` - Test de CORS en navegador
+### 📝 Configuration Files
+- `.env` - Environment variables
+- `requirements.txt` - Python dependencies
+- `start_server.py` - Python startup script
+- `start_server.ps1` - PowerShell startup script
+- `test_server.py` - Testing script
+- `cors_test.html` - CORS test in browser
 
 ### 🧪 Testing
-- **Test de importaciones**: Verificación de dependencias
-- **Test de CORS**: Verificación de conectividad
-- **Test de base de datos**: Verificación de conexiones
-- **Test de Neo4j**: Verificación de grafos
-- **Health checks**: Monitoreo de servicios
+- **Import testing**: Dependency verification
+- **CORS testing**: Connectivity verification
+- **Database testing**: Connection verification
+- **Neo4j testing**: Graph verification
+- **Health checks**: Service monitoring
 
-### 🚧 Pendientes
-- [ ] Tests unitarios completos
-- [ ] Documentación de API con ejemplos
-- [ ] Configuración de CI/CD
-- [ ] Optimización de consultas
-- [ ] Configuración de producción
-- [ ] Monitoreo avanzado
-- [ ] Cache con Redis
+### 🚧 Pending
+- [ ] Complete unit tests
+- [ ] API documentation with examples
+- [ ] CI/CD configuration
+- [ ] Query optimization
+- [ ] Production configuration
+- [ ] Advanced monitoring
+- [ ] Redis cache
 - [ ] Rate limiting
-- [ ] Configuración de SSL
-- [ ] Backup automático
+- [ ] SSL configuration
+- [ ] Automatic backup
 
-### 🐛 Problemas Conocidos
-- ⚠️ CORS configurado permisivamente (`allow_origins=["*"]`)
-- ⚠️ Logs en nivel INFO (puede ser verboso)
-- ⚠️ Sin rate limiting implementado
-- ⚠️ Sin cache implementado
-- ⚠️ Configuración de desarrollo expuesta
+### 🐛 Known Issues
+- ⚠️ CORS configured permissively (`allow_origins=["*"]`)
+- ⚠️ Logs at INFO level (can be verbose)
+- ⚠️ No rate limiting implemented
+- ⚠️ No cache implemented
+- ⚠️ Development configuration exposed
 
-### 📈 Métricas
-- **Endpoints**: 40+ endpoints REST
-- **Modelos**: 11 modelos de datos
-- **Servicios**: 12 servicios de negocio
-- **Routers**: 13 routers organizados
-- **Integraciones**: 4 servicios externos
+### 📈 Metrics
+- **Endpoints**: 40+ REST endpoints
+- **Models**: 11 data models
+- **Services**: 12 business services
+- **Routers**: 13 organized routers
+- **Integrations**: 4 external services
 
-### 🎯 Próximos Pasos
-1. **Implementar Frontend**: React/Vue.js para la interfaz
-2. **Optimizar Performance**: Cache y optimización de consultas
-3. **Mejorar Seguridad**: Rate limiting y validaciones
-4. **Monitoreo**: Métricas y alertas
-5. **Testing**: Cobertura completa de tests
-6. **Documentación**: Tutoriales y guías de uso
-7. **Despliegue**: Configuración de producción
+### 🎯 Next Steps
+1. **Implement Frontend**: React/Vue.js for the interface
+2. **Optimize Performance**: Cache and query optimization
+3. **Improve Security**: Rate limiting and validations
+4. **Monitoring**: Metrics and alerts
+5. **Testing**: Complete test coverage
+6. **Documentation**: Tutorials and usage guides
+7. **Deployment**: Production configuration
 
 ---
 
-## 📊 Estadísticas del Proyecto
+## 📊 Project Statistics
 
-- **Líneas de código**: ~3000+ líneas
-- **Archivos Python**: 50+ archivos
-- **Dependencias**: 25+ paquetes
-- **Bases de datos**: 2 (PostgreSQL + Neo4j)
-- **APIs externas**: 3 (Groq, Amadeus, Supabase)
-- **Tiempo de desarrollo**: Proyecto en desarrollo activo
+- **Lines of code**: ~3000+ lines
+- **Python files**: 50+ files
+- **Dependencies**: 25+ packages
+- **Databases**: 2 (PostgreSQL + Neo4j)
+- **External APIs**: 3 (Groq, Amadeus, Supabase)
+- **Development time**: Active development project
 
-## 🏆 Logros
+## 🏆 Achievements
 
-- ✅ **Arquitectura Escalable**: Diseño modular y mantenible
-- ✅ **Integración Completa**: Múltiples servicios trabajando juntos
-- ✅ **Documentación Completa**: Guías y ejemplos detallados
-- ✅ **Configuración Flexible**: Variables de entorno y configuración
-- ✅ **Herramientas de Desarrollo**: Scripts y utilidades
-- ✅ **Solución de Problemas**: Guías de troubleshooting
+- ✅ **Scalable Architecture**: Modular and maintainable design
+- ✅ **Complete Integration**: Multiple services working together
+- ✅ **Complete Documentation**: Detailed guides and examples
+- ✅ **Flexible Configuration**: Environment variables and configuration
+- ✅ **Development Tools**: Scripts and utilities
+- ✅ **Problem Solving**: Troubleshooting guides
 
-## 📞 Contacto
+## 📞 Contact
 
-Para preguntas sobre el changelog o el proyecto:
-- 📧 Email: [tu-email@ejemplo.com]
-- 🐛 Issues: [GitHub Issues](https://github.com/tu-usuario/travel-prosus/issues)
-- 📖 Documentación: [README.md](./README.md)
+For questions about the changelog or the project:
+- 📧 Email: [your-email@example.com]
+- 🐛 Issues: [GitHub Issues](https://github.com/your-username/travel-prosus/issues)
+- 📖 Documentation: [README.md](./README.md)
 
 ---
 
 <div align="center">
-  <p><strong>Travel Prosus - Planificación de Viajes con IA</strong></p>
-  <p>Versión en desarrollo activo - Última actualización: Diciembre 2024</p>
+  <p><strong>Travel Prosus - AI-Powered Travel Planning</strong></p>
+  <p>Active development version - Last updated: December 2024</p>
 </div>

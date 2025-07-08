@@ -1,31 +1,31 @@
-# 👨‍💻 Guía para Desarrolladores - Travel Prosus
+# 👨‍💻 Developer Guide - Travel Prosus
 
-## 📖 Documentación Técnica Detallada
+## 📖 Detailed Technical Documentation
 
-Esta guía proporciona información técnica detallada para desarrolladores que trabajen con Travel Prosus.
+This guide provides detailed technical information for developers working with Travel Prosus.
 
-## 🏗️ Estructura del Proyecto
+## 🏗️ Project Structure
 
 ```
 travel-prosus/
-├── 📁 ai_agent/                    # Módulo de Inteligencia Artificial
+├── 📁 ai_agent/                    # Artificial Intelligence Module
 │   ├── __init__.py
-│   ├── agent_service.py           # Servicio principal del agente IA
-│   ├── config.py                  # Configuración del agente
-│   ├── models.py                  # Modelos de datos para IA
-│   ├── travel_service.py          # Servicios de viaje
-│   ├── travel_tools.py            # Herramientas de búsqueda
-│   └── test_connection.py         # Tests de conexión
-├── 📁 app/                        # Aplicación principal FastAPI
+│   ├── agent_service.py           # Main AI agent service
+│   ├── config.py                  # Agent configuration
+│   ├── models.py                  # Data models for AI
+│   ├── travel_service.py          # Travel services
+│   ├── travel_tools.py            # Search tools
+│   └── test_connection.py         # Connection tests
+├── 📁 app/                        # Main FastAPI application
 │   ├── __init__.py
-│   ├── main.py                    # Punto de entrada de la aplicación
-│   ├── config.py                  # Configuración global
-│   ├── database.py                # Configuración de base de datos
-│   ├── neo4j_client.py           # Cliente Neo4j
-│   ├── supabaseClient.py         # Cliente Supabase
-│   ├── 📁 middleware/             # Middleware personalizado
-│   │   └── verify_session.py      # Verificación de sesiones
-│   ├── 📁 models/                 # Modelos de datos SQLModel
+│   ├── main.py                    # Application entry point
+│   ├── config.py                  # Global configuration
+│   ├── database.py                # Database configuration
+│   ├── neo4j_client.py           # Neo4j client
+│   ├── supabaseClient.py         # Supabase client
+│   ├── 📁 middleware/             # Custom middleware
+│   │   └── verify_session.py      # Session verification
+│   ├── 📁 models/                 # SQLModel data models
 │   │   ├── user.py
 │   │   ├── group.py
 │   │   ├── trip.py
@@ -37,22 +37,22 @@ travel-prosus/
 │   │   ├── ia_chat.py
 │   │   ├── vote.py
 │   │   └── preference.py
-│   ├── 📁 routers/                # Rutas de API
-│   │   ├── auth.py                # Autenticación
-│   │   ├── users.py               # Gestión de usuarios
-│   │   ├── groups.py              # Gestión de grupos
-│   │   ├── trips.py               # Gestión de viajes
-│   │   ├── flights.py             # Gestión de vuelos
-│   │   ├── hotels.py              # Gestión de hoteles
-│   │   ├── itineraries.py         # Gestión de itinerarios
-│   │   ├── group_members.py       # Miembros de grupo
-│   │   ├── group_chat.py          # Chat de grupo
-│   │   ├── ia_chat.py             # Chat con IA
-│   │   ├── votes.py               # Sistema de votación
-│   │   ├── preferences_neo4j.py   # Preferencias en Neo4j
-│   │   ├── websocket_chat.py      # WebSocket para chat
-│   │   └── agent_preferences.py   # Preferencias del agente
-│   ├── 📁 schemas/                # Esquemas Pydantic
+│   ├── 📁 routers/                # API routes
+│   │   ├── auth.py                # Authentication
+│   │   ├── users.py               # User management
+│   │   ├── groups.py              # Group management
+│   │   ├── trips.py               # Trip management
+│   │   ├── flights.py             # Flight management
+│   │   ├── hotels.py              # Hotel management
+│   │   ├── itineraries.py         # Itinerary management
+│   │   ├── group_members.py       # Group members
+│   │   ├── group_chat.py          # Group chat
+│   │   ├── ia_chat.py             # AI chat
+│   │   ├── votes.py               # Voting system
+│   │   ├── preferences_neo4j.py   # Preferences in Neo4j
+│   │   ├── websocket_chat.py      # WebSocket for chat
+│   │   └── agent_preferences.py   # Agent preferences
+│   ├── 📁 schemas/                # Pydantic schemas
 │   │   ├── auth.py
 │   │   ├── user.py
 │   │   ├── group.py
@@ -64,7 +64,7 @@ travel-prosus/
 │   │   ├── group_chat.py
 │   │   ├── ia_chat.py
 │   │   └── vote.py
-│   └── 📁 services/               # Lógica de negocio
+│   └── 📁 services/               # Business logic
 │       ├── user.py
 │       ├── group.py
 │       ├── trip.py
@@ -79,49 +79,49 @@ travel-prosus/
 │       ├── chat_service.py
 │       ├── realtime_chat.py
 │       └── agent_preferences_service.py
-├── 📁 docs/                       # Documentación
+├── 📁 docs/                       # Documentation
 │   └── realtime_chat_guide.md
-├── 📄 requirements.txt            # Dependencias Python
-├── 📄 .env                        # Variables de entorno
-├── 📄 env.example                 # Ejemplo de variables de entorno
-├── 📄 start_server.py             # Script de inicio
-├── 📄 start_server.ps1            # Script PowerShell
-├── 📄 test_server.py              # Script de testing
-├── 📄 cors_test.html              # Test de CORS
-├── 📄 CORS_SOLUTION.md            # Solución de problemas CORS
-└── 📄 README.md                   # Documentación principal
+├── 📄 requirements.txt            # Python dependencies
+├── 📄 .env                        # Environment variables
+├── 📄 env.example                 # Environment variables example
+├── 📄 start_server.py             # Startup script
+├── 📄 start_server.ps1            # PowerShell script
+├── 📄 test_server.py              # Testing script
+├── 📄 cors_test.html              # CORS test
+├── 📄 CORS_SOLUTION.md            # CORS troubleshooting
+└── 📄 README.md                   # Main documentation
 ```
 
-## 🔧 Configuración de Desarrollo
+## 🔧 Development Setup
 
-### 1. Configuración del Entorno
+### 1. Environment Configuration
 
 ```bash
-# Clonar el repositorio
-git clone https://github.com/tu-usuario/travel-prosus.git
+# Clone repository
+git clone https://github.com/your-username/travel-prosus.git
 cd travel-prosus
 
-# Crear entorno virtual
+# Create virtual environment
 python -m venv venv
 
-# Activar entorno virtual (Windows)
+# Activate virtual environment (Windows)
 venv\Scripts\activate
 
-# Activar entorno virtual (macOS/Linux)
+# Activate virtual environment (macOS/Linux)
 source venv/bin/activate
 
-# Instalar dependencias
+# Install dependencies
 pip install -r requirements.txt
 
-# Instalar dependencias de desarrollo (opcional)
+# Install development dependencies (optional)
 pip install pytest pytest-asyncio httpx black flake8 mypy
 ```
 
-### 2. Configuración de Variables de Entorno
+### 2. Environment Variables Configuration
 
 ```env
 # .env
-# Base de datos
+# Database
 DATABASE_URL=postgresql://user:pass@localhost:5432/travel_prosus
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-supabase-anon-key
@@ -132,12 +132,12 @@ NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=your-password
 NEO4J_DATABASE=neo4j
 
-# APIs externas
+# External APIs
 AMADEUS_API_KEY=your-amadeus-key
 AMADEUS_API_SECRET=your-amadeus-secret
 GROQ_API_KEY=your-groq-key
 
-# Configuración del agente IA
+# AI agent configuration
 MODEL_NAME=llama-3.1-8b-instant
 MAX_TOKENS=4096
 TEMPERATURE=0.7
@@ -145,7 +145,7 @@ TOOLS_ENABLED=true
 JSON_MODE=true
 ```
 
-### 3. Configuración de Base de Datos
+### 3. Database Configuration
 
 ```python
 # app/database.py
@@ -154,18 +154,18 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 import os
 
-# Configuración del motor de base de datos
+# Database engine configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_async_engine(
     DATABASE_URL,
-    echo=True,  # Para debugging
+    echo=True,  # For debugging
     future=True,
     pool_size=20,
     max_overflow=30,
     pool_pre_ping=True
 )
 
-# Configuración de la sesión
+# Session configuration
 async_session = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )
@@ -179,9 +179,9 @@ async def init_db():
         await conn.run_sync(SQLModel.metadata.create_all)
 ```
 
-## 🤖 Módulo de Inteligencia Artificial
+## 🤖 Artificial Intelligence Module
 
-### Estructura del Agente IA
+### AI Agent Structure
 
 ```python
 # ai_agent/agent_service.py
@@ -199,19 +199,19 @@ class AgentService:
         )
     
     async def process_message(self, message: str, context: dict = None):
-        """Procesar mensaje del usuario y generar respuesta"""
+        """Process user message and generate response"""
         
     async def search_flights(self, **kwargs):
-        """Buscar vuelos usando Amadeus API"""
+        """Search flights using Amadeus API"""
         
     async def search_hotels(self, **kwargs):
-        """Buscar hoteles usando Amadeus API"""
+        """Search hotels using Amadeus API"""
         
     async def get_recommendations(self, user_preferences: dict):
-        """Obtener recomendaciones basadas en preferencias"""
+        """Get recommendations based on preferences"""
 ```
 
-### Herramientas de Búsqueda
+### Search Tools
 
 ```python
 # ai_agent/travel_tools.py
@@ -237,20 +237,20 @@ class TravelPriceSearcher:
         self.access_token = None
     
     async def get_access_token(self):
-        """Obtener token de acceso de Amadeus"""
+        """Get Amadeus access token"""
         
     async def search_flights(self, origin: str, destination: str, 
                            departure_date: str, **kwargs) -> List[FlightPrice]:
-        """Buscar vuelos"""
+        """Search flights"""
         
     async def search_hotels(self, destination: str, 
                           check_in: str, check_out: str, **kwargs):
-        """Buscar hoteles"""
+        """Search hotels"""
 ```
 
-## 💬 Sistema de Chat en Tiempo Real
+## 💬 Real-time Chat System
 
-### Configuración WebSocket
+### WebSocket Configuration
 
 ```python
 # app/routers/websocket_chat.py
@@ -271,7 +271,7 @@ async def websocket_chat(websocket: WebSocket, group_id: str):
         await chat_manager.disconnect(websocket, group_id)
 ```
 
-### Gestor de Chat
+### Chat Manager
 
 ```python
 # app/services/realtime_chat.py
@@ -304,9 +304,9 @@ class RealtimeChatManager:
         await self.send_message(message, group_id)
 ```
 
-## 📊 Integración con Neo4j
+## 📊 Neo4j Integration
 
-### Cliente Neo4j
+### Neo4j Client
 
 ```python
 # app/neo4j_client.py
@@ -338,7 +338,7 @@ class Neo4jClient:
             return [record async for record in result]
 ```
 
-### Servicio de Preferencias
+### Preference Service
 
 ```python
 # app/services/preference_service.py
@@ -351,7 +351,7 @@ class PreferenceService:
         self.neo4j_client = Neo4jClient()
     
     async def get_user_preferences(self, user_id: uuid.UUID):
-        """Obtener preferencias de un usuario"""
+        """Get user preferences"""
         query = """
         MATCH (u:User {id_sql: $user_id})-[:PREFERS]->(p:Preference)
         RETURN p.category, p.value, p.weight
@@ -364,7 +364,7 @@ class PreferenceService:
         return result
     
     async def save_user_preferences(self, user_id: uuid.UUID, preferences: List[Dict]):
-        """Guardar preferencias de usuario"""
+        """Save user preferences"""
         query = """
         MERGE (u:User {id_sql: $user_id})
         WITH u
@@ -380,9 +380,9 @@ class PreferenceService:
         await self.neo4j_client.close()
 ```
 
-## 🔒 Autenticación y Seguridad
+## 🔒 Authentication and Security
 
-### Middleware de Autenticación
+### Authentication Middleware
 
 ```python
 # app/middleware/verify_session.py
@@ -395,7 +395,7 @@ security = HTTPBearer()
 
 async def get_verify_session(token: str = Depends(security)):
     try:
-        # Verificar token con Supabase
+        # Verify token with Supabase
         user = supabase.auth.get_user(token.credentials)
         if not user:
             raise HTTPException(
@@ -410,7 +410,7 @@ async def get_verify_session(token: str = Depends(security)):
         )
 ```
 
-### Configuración CORS
+### CORS Configuration
 
 ```python
 # app/main.py
@@ -418,7 +418,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configurar para producción
+    allow_origins=["*"],  # Configure for production
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
@@ -428,7 +428,7 @@ app.add_middleware(
 
 ## 🧪 Testing
 
-### Configuración de Tests
+### Test Configuration
 
 ```python
 # tests/conftest.py
@@ -439,7 +439,7 @@ from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.database import get_db
 
-# Base de datos de test
+# Test database
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -458,7 +458,7 @@ def client():
     return TestClient(app)
 ```
 
-### Tests de Endpoints
+### Endpoint Tests
 
 ```python
 # tests/test_users.py
@@ -481,7 +481,7 @@ def test_get_users(client: TestClient):
     assert isinstance(response.json(), list)
 ```
 
-### Tests de WebSocket
+### WebSocket Tests
 
 ```python
 # tests/test_websocket.py
@@ -497,9 +497,9 @@ def test_websocket_chat(client: TestClient):
         assert response["content"] == "Hello"
 ```
 
-## 📈 Monitoreo y Logging
+## 📈 Monitoring and Logging
 
-### Configuración de Logs
+### Logging Configuration
 
 ```python
 # app/config.py
@@ -516,7 +516,7 @@ def setup_logging(log_level: str = "INFO"):
         ]
     )
     
-    # Configurar loggers específicos
+    # Configure specific loggers
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("uvicorn").setLevel(logging.INFO)
 ```
@@ -534,11 +534,11 @@ router = APIRouter()
 @router.get("/health")
 async def health_check():
     try:
-        # Verificar conexión a PostgreSQL
+        # Check PostgreSQL connection
         async with engine.begin() as conn:
             await conn.execute("SELECT 1")
         
-        # Verificar conexión a Neo4j
+        # Check Neo4j connection
         neo4j_client = Neo4jClient()
         await neo4j_client.connect()
         await neo4j_client.execute_query("RETURN 1")
@@ -556,7 +556,7 @@ async def health_check():
         }
 ```
 
-## 🚀 Despliegue
+## 🚀 Deployment
 
 ### Docker
 
@@ -565,22 +565,22 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Instalar dependencias del sistema
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar requirements y instalar dependencias Python
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar código fuente
+# Copy source code
 COPY . .
 
-# Exponer puerto
+# Expose port
 EXPOSE 8000
 
-# Comando para ejecutar la aplicación
+# Command to run the application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
@@ -633,7 +633,7 @@ volumes:
   neo4j_data:
 ```
 
-## 🔧 Herramientas de Desarrollo
+## 🔧 Development Tools
 
 ### Pre-commit Hooks
 
@@ -694,9 +694,9 @@ docker-logs:
 	docker-compose logs -f app
 ```
 
-## 📚 Recursos Adicionales
+## 📚 Additional Resources
 
-### Documentación de APIs
+### API Documentation
 
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [Groq API Documentation](https://console.groq.com/docs)
@@ -704,29 +704,29 @@ docker-logs:
 - [Neo4j Driver Documentation](https://neo4j.com/docs/api/python-driver/)
 - [Supabase Python Documentation](https://supabase.com/docs/reference/python)
 
-### Ejemplos de Uso
+### Usage Examples
 
 ```python
-# Ejemplo completo de uso del sistema
+# Complete system usage example
 async def example_usage():
-    # 1. Crear usuario
+    # 1. Create user
     user = await UserService.create_user(
         username="johndoe",
         email="john@example.com",
         name="John Doe"
     )
     
-    # 2. Crear grupo
+    # 2. Create group
     group = await GroupService.create_group(
-        name="Viaje a París",
-        description="Viaje de fin de semana",
+        name="Paris Trip",
+        description="Weekend trip",
         created_by=user.id
     )
     
-    # 3. Agregar miembro al grupo
+    # 3. Add member to group
     await GroupMemberService.add_member(group.id, user.id)
     
-    # 4. Buscar vuelos con IA
+    # 4. Search flights with AI
     agent = AgentService()
     flights = await agent.search_flights(
         origin="MAD",
@@ -734,11 +734,11 @@ async def example_usage():
         departure_date="2024-12-01"
     )
     
-    # 5. Guardar preferencias
+    # 5. Save preferences
     await PreferenceService.save_user_preferences(
         user.id,
         [{"category": "accommodation", "value": "hotel", "weight": 0.8}]
     )
 ```
 
-Esta documentación proporciona una guía completa para desarrolladores que trabajen con Travel Prosus. Mantén este archivo actualizado a medida que el proyecto evolucione.
+This documentation provides a complete guide for developers working with Travel Prosus. Keep this file updated as the project evolves.
