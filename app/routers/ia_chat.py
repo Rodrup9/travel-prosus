@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.services.chat_service import ChatService
 from ai_agent.agent_service import TripPlannerAgent
-from ai_agent.models import TripContext, UserPreferences, ChatMessage, AgentResponse
-from app.models.trip import Trip
+from ai_agent.models import TripContext, UserPreferences, ChatMessage
+from app.services.agent_preferences_service import AgentPreferencesService
 from pydantic import BaseModel
 from datetime import datetime, date
 import groq
@@ -20,8 +20,11 @@ from app.models.ia_chat import IAChat
 from app.models.group import Group
 from app.models.user import User
 from app.models.group_chat import GroupChat
+from app.models.trip import Trip
+from app.models.itinerary import Itinerary
 from dotenv import load_dotenv, dotenv_values
 import os
+import httpx
 
 router = APIRouter(prefix="/ia_chat", tags=["IA Chat"])
 
@@ -63,6 +66,58 @@ async def validate_user_and_group(db: AsyncSession, user_id: uuid.UUID, group_id
     )
     result = await db.execute(stmt)
     return result.first() is not None
+
+async def get_group_preferences_for_agent(group_id: uuid.UUID, db: AsyncSession) -> List[UserPreferences]:
+    """
+    Obtiene las preferencias de los usuarios del grupo para el agente
+    """
+    try:
+        # Obtener preferencias desde Neo4j
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://hstp4bpv-8000.usw3.devtunnels.ms/preferences/group/{group_id}"
+            )
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail="Error obteniendo preferencias del grupo"
+                )
+            
+            preferences_data = response.json()
+            return AgentPreferencesService.transform_preferences_to_agent_format(preferences_data)
+            
+    except Exception as e:
+        print(f"Error obteniendo preferencias: {str(e)}")
+        # Retornar lista vacía si hay error
+        return []
+
+async def create_or_get_trip(group_id: uuid.UUID, db: AsyncSession) -> Trip:
+    """
+    Crea un nuevo viaje o obtiene uno existente para el grupo
+    """
+    # Buscar si ya existe un viaje activo para este grupo
+    stmt = select(Trip).where(
+        Trip.group_id == group_id,
+        Trip.status == True
+    )
+    result = await db.execute(stmt)
+    existing_trip = result.scalar_one_or_none()
+    
+    if existing_trip:
+        return existing_trip
+    
+    # Crear nuevo viaje
+    new_trip = Trip(
+        group_id=group_id,
+        destination="",  # Se actualizará cuando se genere el itinerario
+        start_date=None,  # Se actualizará cuando se genere el itinerario
+        end_date=None,    # Se actualizará cuando se genere el itinerario
+        status=True
+    )
+    db.add(new_trip)
+    await db.flush()
+    await db.refresh(new_trip)
+    return new_trip
 
 @router.get("/test-config")
 async def test_config():
@@ -185,7 +240,7 @@ async def send_message_to_agent(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Envía un mensaje al agente y obtiene su respuesta.
+    Envía un mensaje al agente y obtiene su respuesta usando el TripPlannerAgent especializado.
     """
     try:
         # Validar que el usuario y grupo existan
@@ -210,8 +265,8 @@ async def send_message_to_agent(
         )
         db.add(user_message)
         await db.flush()
-
-        # Obtener historial de chat
+        
+        # Obtener mensajes del chat para el contexto
         stmt = select(IAChat).where(
             IAChat.group_id == chat_request.group_id,
             IAChat.status == True
@@ -285,6 +340,9 @@ async def send_message_to_agent(
             trip_id=trip.id
         )
             
+        finally:
+            sync_db.close()
+            
     except Exception as e:
         await db.rollback()
         # Debug: Imprimir el error completo
@@ -295,4 +353,106 @@ async def send_message_to_agent(
         raise HTTPException(
             status_code=500,
             detail=f"Error procesando el mensaje: {str(e)}"
+        )
+
+@router.get("/itinerary/{group_id}")
+async def get_group_itinerary(
+    group_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene el itinerario guardado para un grupo
+    """
+    try:
+        # Buscar el viaje activo del grupo
+        stmt = select(Trip).where(
+            Trip.group_id == group_id,
+            Trip.status == True
+        )
+        result = await db.execute(stmt)
+        trip = result.scalar_one_or_none()
+        
+        if not trip:
+            raise HTTPException(
+                status_code=404,
+                detail="No se encontró un viaje activo para este grupo"
+            )
+        
+        # Obtener itinerario del viaje
+        stmt = select(Itinerary).where(
+            Itinerary.trip_id == trip.id,
+            Itinerary.status == True
+        ).order_by(Itinerary.day, Itinerary.start_time)
+        result = await db.execute(stmt)
+        itineraries = result.scalars().all()
+        
+        # Obtener vuelos del viaje
+        from app.models.flight import Flight
+        stmt = select(Flight).where(
+            Flight.trip_id == trip.id,
+            Flight.status == True
+        )
+        result = await db.execute(stmt)
+        flights = result.scalars().all()
+        
+        # Obtener hoteles del viaje
+        from app.models.hotel import Hotel
+        stmt = select(Hotel).where(
+            Hotel.trip_id == trip.id,
+            Hotel.status == True
+        )
+        result = await db.execute(stmt)
+        hotels = result.scalars().all()
+        
+        # Formatear respuesta
+        itinerary_data = {
+            "trip": {
+                "id": str(trip.id),
+                "destination": trip.destination,
+                "start_date": trip.start_date.isoformat() if trip.start_date else None,
+                "end_date": trip.end_date.isoformat() if trip.end_date else None,
+                "created_at": trip.created_at.isoformat()
+            },
+            "itinerary": [
+                {
+                    "id": str(item.id),
+                    "day": item.day.isoformat(),
+                    "activity": item.activity,
+                    "location": item.location,
+                    "start_time": item.start_time.isoformat() if item.start_time else None,
+                    "end_time": item.end_time.isoformat() if item.end_time else None
+                }
+                for item in itineraries
+            ],
+            "flights": [
+                {
+                    "id": str(flight.id),
+                    "airline": flight.airline,
+                    "departure_airport": flight.departure_airport,
+                    "arrival_airport": flight.arrival_airport,
+                    "departure_time": flight.departure_time.isoformat(),
+                    "arrival_time": flight.arrival_time.isoformat(),
+                    "price": float(flight.price) if flight.price else None
+                }
+                for flight in flights
+            ],
+            "hotels": [
+                {
+                    "id": str(hotel.id),
+                    "name": hotel.name,
+                    "location": hotel.location,
+                    "price_per_night": float(hotel.price_per_night) if hotel.price_per_night else None,
+                    "rating": float(hotel.rating) if hotel.rating else None,
+                    "link": hotel.link
+                }
+                for hotel in hotels
+            ]
+        }
+        
+        return itinerary_data
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error obteniendo el itinerario: {str(e)}"
         )

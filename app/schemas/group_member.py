@@ -18,6 +18,7 @@ class GroupMemberResponse(GroupMemberBase):
     group_id: uuid.UUID
     user_id: uuid.UUID
     created_at: datetime
+    name: Optional[str] = None
 
     class Config:
         from_attributes = True
